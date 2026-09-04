@@ -47,11 +47,24 @@ pub fn remove_block(text: &str, key: &str) -> String {
     while s.contains("\n\n\n") {
         s = s.replace("\n\n\n", "\n\n");
     }
+    // dsh requires a top-level YAML *array*; an all-comment file parses as null
+    // and fails loudly at boot, so restore the shipped `[]` placeholder.
+    let has_content = s.lines().any(|l| {
+        let t = l.trim();
+        !t.is_empty() && !t.starts_with('#')
+    });
+    if !has_content {
+        s = s.trim_end().to_string();
+        if !s.is_empty() {
+            s.push('\n');
+        }
+        s.push_str("[]\n");
+    }
     s
 }
 
 pub fn upsert_block(text: &str, key: &str, body: &str) -> String {
-    let base = remove_block(&strip_empty_list(text), key);
+    let base = strip_empty_list(&remove_block(text, key));
     let mut s = base.trim_end().to_string();
     if !s.is_empty() {
         s.push_str("\n\n");
@@ -184,6 +197,19 @@ mod tests {
         assert!(!has_block(&c, "plugin a"));
         assert!(has_block(&c, "plugin b"));
         assert!(c.contains("id: hd-tool-web"));
+    }
+
+    #[test]
+    fn removing_last_block_restores_empty_array() {
+        let a = upsert_block(SHIPPED, MODEL_KEY, &model_block(&prov(true), "deepseek-chat"));
+        assert!(!a.lines().any(|l| l.trim() == "[]"));
+        let b = remove_block(&a, MODEL_KEY);
+        assert!(b.lines().any(|l| l.trim() == "[]"), "placeholder restored: {b}");
+        assert!(b.contains("# Your patch layer"));
+        // and it round-trips back to a real block
+        let c = upsert_block(&b, "plugin x", &plugin_block("./x.mjs"));
+        assert!(!c.lines().any(|l| l.trim() == "[]"));
+        assert!(has_block(&c, "plugin x"));
     }
 
     #[test]

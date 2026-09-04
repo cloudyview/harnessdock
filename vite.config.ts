@@ -9,7 +9,9 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // bind IPv4 explicitly: Node resolves "localhost" to ::1 only on some Windows setups,
+    // and WebView2 then gets ERR_CONNECTION_REFUSED on 127.0.0.1
+    host: host || "127.0.0.1",
     hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: { ignored: ["**/src-tauri/**"] },
   },

@@ -42,16 +42,42 @@ pub fn install(rt_root: &str, version: &str, registry: &str) -> R<String> {
         fs::write(&pkg, "{\n  \"name\": \"harnessdock-runtime\",\n  \"private\": true\n}\n").map_err(err)?;
     }
     let spec = format!("@deepseek-ai/dsh@{version}");
-    let mut c = shell_tool("npm");
-    c.args(["install", &spec, "--no-audit", "--no-fund", "--loglevel", "error", "--save-exact"]);
-    if !registry.is_empty() {
-        c.arg("--registry").arg(registry);
+    // pnpm first: it resumes from its content-addressable store, so flaky
+    // networks converge over a few attempts. npm is the fallback.
+    let mut last = String::new();
+    let mut ok = false;
+    for attempt in 1..=3 {
+        let mut c = shell_tool("pnpm");
+        c.args(["add", &spec, "--save-exact", "--reporter=append-only", "--fetch-retries", "10", "--fetch-retry-maxtimeout", "60000", "--network-concurrency", "4"]);
+        if !registry.is_empty() {
+            c.arg("--registry").arg(registry);
+        }
+        c.current_dir(&dir);
+        match run_capture(&mut c) {
+            Ok((true, _)) if dsh::runtime_installed(rt_root, version) => {
+                ok = true;
+                break;
+            }
+            Ok((_, out)) => last = format!("pnpm 第 {attempt} 次尝试失败:\n{}", tail(&out, 12)),
+            Err(e) => {
+                last = e;
+                break; // pnpm missing: go straight to npm
+            }
+        }
     }
-    c.current_dir(&dir);
-    let (ok, out) = run_capture(&mut c)?;
     if !ok {
-        return Err(format!("npm install 失败:\n{}", out.trim()));
+        let mut c = shell_tool("npm");
+        c.args(["install", &spec, "--no-audit", "--no-fund", "--loglevel", "error", "--save-exact", "--fetch-retries", "5"]);
+        if !registry.is_empty() {
+            c.arg("--registry").arg(registry);
+        }
+        c.current_dir(&dir);
+        let (npm_ok, out) = run_capture(&mut c)?;
+        if !npm_ok {
+            return Err(format!("{last}\nnpm 兜底也失败:\n{}", tail(&out, 12)));
+        }
     }
+    let out = String::from("ok");
     if !dsh::runtime_installed(rt_root, version) {
         return Err("npm 完成但没有找到 dsh/lib/bin.js，安装包可能不完整".into());
     }
@@ -60,6 +86,11 @@ pub fn install(rt_root: &str, version: &str, registry: &str) -> R<String> {
         return Err(format!("请求 {version} 但安装到的是 {got}"));
     }
     Ok(out)
+}
+
+fn tail(s: &str, n: usize) -> String {
+    let v: Vec<&str> = s.lines().collect();
+    v[v.len().saturating_sub(n)..].join("\n")
 }
 
 pub fn remove(rt_root: &str, version: &str) -> R<()> {

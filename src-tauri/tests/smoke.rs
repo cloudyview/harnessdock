@@ -37,10 +37,22 @@ fn create_start_stop_capture() {
     store.reg.settings.pool_end = 41600;
     store.save().unwrap();
 
-    // 1. runtime
+    // 1. runtime — download from npm, or (HD_SMOKE_RUNTIME_SRC=<dir with node_modules>) copy a local install
     let t0 = Instant::now();
-    runtimes::install(&store.reg.settings.rt_root, &version, &store.reg.settings.registry).expect("runtime install");
-    println!("runtime installed in {:?}", t0.elapsed());
+    match std::env::var("HD_SMOKE_RUNTIME_SRC") {
+        Ok(src) => {
+            let dst = dsh::runtime_dir(&store.reg.settings.rt_root, &version);
+            std::fs::create_dir_all(&dst).unwrap();
+            let n = harnessdock_lib::util::copy_dir(&Path::new(&src).join("node_modules"), &dst.join("node_modules"), &[]).expect("copy runtime");
+            println!("runtime copied from {src}: {n} files in {:?}", t0.elapsed());
+            let got = dsh::version_in(&dst).expect("version in copied runtime");
+            assert_eq!(got, version, "HD_SMOKE_RUNTIME_SRC holds a different dsh version");
+        }
+        Err(_) => {
+            runtimes::install(&store.reg.settings.rt_root, &version, &store.reg.settings.registry).expect("runtime install");
+            println!("runtime installed in {:?}", t0.elapsed());
+        }
+    }
     assert!(dsh::runtime_installed(&store.reg.settings.rt_root, &version));
     store.set_default_runtime(Some(version.clone()));
     store.save().unwrap();
