@@ -102,6 +102,21 @@ pub fn move_dir(src: &Path, dst: &Path) -> R<()> {
     Ok(())
 }
 
+pub fn move_dir_or_file(src: &Path, dst: &Path) -> R<()> {
+    if src.is_dir() {
+        move_dir(src, dst)
+    } else {
+        if let Some(p) = dst.parent() {
+            fs::create_dir_all(p).map_err(err)?;
+        }
+        if fs::rename(src, dst).is_err() {
+            fs::copy(src, dst).map_err(err)?;
+            fs::remove_file(src).map_err(err)?;
+        }
+        Ok(())
+    }
+}
+
 pub fn dir_size(p: &Path) -> u64 {
     let mut total = 0;
     if let Ok(rd) = fs::read_dir(p) {

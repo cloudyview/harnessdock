@@ -40,7 +40,7 @@ cd src-tauri && cargo test
 pnpm tauri build      # 产出安装包到 src-tauri/target/release/bundle
 ```
 
-数据目录：`%LOCALAPPDATA%\HarnessDock\`（`registry.json`、日志、模板、回收站）。可用环境变量 `HARNESSDOCK_DATA` 覆盖。
+数据目录：`~\.harnessdock\`（`registry.json`、日志、模板、回收站），与 `~\.dsh` 同风格。可用环境变量 `HARNESSDOCK_DATA` 覆盖。安装包（NSIS，按用户安装）把程序放在 `%LOCALAPPDATA%\HarnessDock\`，两者分开，卸载不会动数据；也不放 AppData，避免被沙盒化启动器（MSIX 打包应用）虚拟化后正常启动看不到。
 
 ## 与 dsh 的约定
 

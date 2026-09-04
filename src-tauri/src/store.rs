@@ -8,16 +8,46 @@ pub struct Store {
 }
 
 impl Store {
+    /// `~/.harnessdock` — a dot-dir in the user's home, like `~/.dsh`.
+    /// Deliberately *not* under AppData: the NSIS per-user installer lives in
+    /// `%LOCALAPPDATA%\HarnessDock` (an uninstall must not delete the registry),
+    /// and packaged/sandboxed launchers virtualise AppData so data written there
+    /// can end up invisible to a normal launch from the Start menu.
     pub fn data_dir() -> PathBuf {
         if let Ok(p) = std::env::var("HARNESSDOCK_DATA") {
             return PathBuf::from(p);
         }
-        dirs::data_local_dir()
+        dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("HarnessDock")
+            .join(".harnessdock")
+    }
+
+    /// One-time move of data written by early builds into AppData locations.
+    fn migrate_legacy(dir: &PathBuf) {
+        if dir.join("registry.json").exists() {
+            return;
+        }
+        let candidates = [
+            dirs::config_dir().map(|d| d.join("HarnessDock")),
+            dirs::data_local_dir().map(|d| d.join("HarnessDock")),
+        ];
+        for old in candidates.into_iter().flatten() {
+            if old == *dir || !old.join("registry.json").exists() {
+                continue;
+            }
+            let _ = std::fs::create_dir_all(dir);
+            for item in ["registry.json", "instances", "templates", ".trash"] {
+                let from = old.join(item);
+                if from.exists() {
+                    let _ = crate::util::move_dir_or_file(&from, &dir.join(item));
+                }
+            }
+            break;
+        }
     }
 
     pub fn open(dir: PathBuf) -> Store {
+        Self::migrate_legacy(&dir);
         let file = dir.join("registry.json");
         let reg = if file.exists() {
             match read_json::<Registry>(&file) {
