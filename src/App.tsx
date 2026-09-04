@@ -12,6 +12,7 @@ import Drawer from "./views/Drawer";
 import NewInstance from "./modals/NewInstance";
 import ImportWizard from "./modals/Import";
 import CaptureTemplate from "./modals/Capture";
+import Welcome from "./modals/Welcome";
 
 export interface Ctx {
   snap: Snapshot;
@@ -37,7 +38,7 @@ function Shell() {
   const [view, setView] = useState<View>("instances");
   const [sel, setSel] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
-  const [modal, setModal] = useState<{ kind: "new"; tpl?: string } | { kind: "import" } | { kind: "capture"; id?: string } | null>(null);
+  const [modal, setModal] = useState<{ kind: "new"; tpl?: string } | { kind: "import"; deep?: boolean } | { kind: "capture"; id?: string } | { kind: "welcome" } | null>(null);
   const busy = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -57,6 +58,17 @@ function Shell() {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [modal]);
+
+  // First run: nothing managed yet → the initial action is to find and adopt
+  // the dsh installs already on this machine.
+  const onboarded = useRef(false);
+  useEffect(() => {
+    if (!snap || onboarded.current) return;
+    onboarded.current = true;
+    let seen = false;
+    try { seen = localStorage.getItem("hd.onboarded") === "1"; } catch { /* ignore */ }
+    if (!seen && snap.instances.length === 0 && snap.trash.length === 0) setModal({ kind: "welcome" });
+  }, [snap]);
 
   if (!snap) return <div className="empty" style={{ margin: 40 }}>正在读取实例状态…</div>;
 
@@ -95,7 +107,13 @@ function Shell() {
         <Drawer ctx={ctx} inst={snap.instances.find((i) => i.id === sel)!} tab={tab} setTab={setTab} onClose={() => setSel(null)} />
       )}
       {modal?.kind === "new" && <NewInstance ctx={ctx} tpl={modal.tpl} onClose={() => setModal(null)} />}
-      {modal?.kind === "import" && <ImportWizard ctx={ctx} onClose={() => setModal(null)} />}
+      {modal?.kind === "import" && <ImportWizard ctx={ctx} deep={modal.deep} onClose={() => setModal(null)} />}
+      {modal?.kind === "welcome" && (
+        <Welcome
+          onImport={() => { try { localStorage.setItem("hd.onboarded", "1"); } catch { /* ignore */ } setModal({ kind: "import", deep: true }); }}
+          onSkip={() => { try { localStorage.setItem("hd.onboarded", "1"); } catch { /* ignore */ } setModal(null); }}
+        />
+      )}
       {modal?.kind === "capture" && <CaptureTemplate ctx={ctx} id={modal.id} onClose={() => setModal(null)} />}
     </div>
   );

@@ -32,7 +32,38 @@ pub fn scan(roots: &[String], known_homes: &[String], rt_root: &str) -> Vec<Cand
     for r in roots {
         walk(Path::new(r), 0, &mut seen, &mut out, &known, &rt_root_n);
     }
-    out
+    // an install whose home is ~/.dsh shows up twice (once as the home, once as
+    // the install dir); keep the install-dir entry because it carries the runtime
+    let mut by_home: Vec<Candidate> = Vec::new();
+    for c in out {
+        let key = norm(&c.home);
+        if let Some(prev) = by_home.iter_mut().find(|x| norm(&x.home) == key) {
+            // prefer a real install dir over the home itself or a dir inside it
+            // (`~/.dsh/profiles/node_modules` is only junctions into the install)
+            let inside = |p: &str| norm(p).starts_with(&key);
+            if prev.runtime.is_none() || (inside(&prev.path) && !inside(&c.path)) {
+                *prev = c;
+            }
+        } else {
+            by_home.push(c);
+        }
+    }
+    by_home
+}
+
+/// Roots of every local drive (Windows) or `/` elsewhere.
+pub fn fixed_drives() -> Vec<String> {
+    #[cfg(windows)]
+    {
+        ('C'..='Z')
+            .map(|c| format!("{c}:\\"))
+            .filter(|p| Path::new(p).is_dir())
+            .collect()
+    }
+    #[cfg(not(windows))]
+    {
+        vec![dirs::home_dir().map(|h| h.to_string_lossy().to_string()).unwrap_or_else(|| "/".into())]
+    }
 }
 
 fn walk(dir: &Path, depth: usize, seen: &mut HashSet<PathBuf>, out: &mut Vec<Candidate>, known: &HashSet<String>, rt_root: &str) {
@@ -46,7 +77,7 @@ fn walk(dir: &Path, depth: usize, seen: &mut HashSet<PathBuf>, out: &mut Vec<Can
     if dir.join("node_modules").join("@deepseek-ai").join("dsh").join("package.json").exists() {
         if seen.insert(dir.to_path_buf()) {
             let home = detect_home(dir);
-            if !known.contains(&norm(&home.to_string_lossy())) {
+            if !known.contains(&norm(&home.to_string_lossy())) && !known.contains(&norm(&dir.to_string_lossy())) {
                 if let Some(c) = candidate_from_install(dir, &home) {
                     out.push(c);
                 }

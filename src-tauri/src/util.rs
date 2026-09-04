@@ -55,7 +55,17 @@ pub fn run_capture(cmd: &mut Command) -> R<(bool, String)> {
     Ok((out.status.success(), text))
 }
 
+/// Recursive copy that *follows* directory junctions/symlinks (dsh's hoisted
+/// pnpm layout links `profiles/node_modules/*` to the launcher install), with a
+/// depth cap so a link cycle cannot run forever.
 pub fn copy_dir(src: &Path, dst: &Path, skip: &[&str]) -> R<u64> {
+    copy_dir_depth(src, dst, skip, 0)
+}
+
+fn copy_dir_depth(src: &Path, dst: &Path, skip: &[&str], depth: usize) -> R<u64> {
+    if depth > 48 {
+        return Err(format!("目录嵌套过深（可能是链接循环）: {}", src.display()));
+    }
     let mut n = 0u64;
     fs::create_dir_all(dst).map_err(err)?;
     for entry in fs::read_dir(src).map_err(err)? {
@@ -67,10 +77,11 @@ pub fn copy_dir(src: &Path, dst: &Path, skip: &[&str]) -> R<u64> {
         }
         let from = entry.path();
         let to = dst.join(&name);
-        let ft = entry.file_type().map_err(err)?;
-        if ft.is_dir() {
-            n += copy_dir(&from, &to, skip)?;
-        } else if ft.is_file() {
+        // metadata() follows links; a dangling link is skipped
+        let Ok(md) = fs::metadata(&from) else { continue };
+        if md.is_dir() {
+            n += copy_dir_depth(&from, &to, skip, depth + 1)?;
+        } else if md.is_file() {
             fs::copy(&from, &to).map_err(|e| format!("复制 {} 失败: {}", from.display(), e))?;
             n += 1;
         }

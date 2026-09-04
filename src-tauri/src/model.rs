@@ -94,6 +94,9 @@ pub struct Instance {
     pub notes: String,
     #[serde(default)]
     pub created_at: String,
+    /// original install dir + home for imported instances, so rescans skip them
+    #[serde(default)]
+    pub source: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]

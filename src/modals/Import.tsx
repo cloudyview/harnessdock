@@ -6,7 +6,7 @@ import { Modal, Progress, errMsg, fmtBytes, useToast } from "../ui";
 
 type Row = Candidate & { sel: boolean; id: string; profile: string };
 
-export default function ImportWizard({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
+export default function ImportWizard({ ctx, deep, onClose }: { ctx: Ctx; deep?: boolean; onClose: () => void }) {
   const toast = useToast();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [migrate, setMigrate] = useState(true);
@@ -21,7 +21,8 @@ export default function ImportWizard({ ctx, onClose }: { ctx: Ctx; onClose: () =
       setRows(list.map((c) => ({ ...c, sel: true, id: uniq(c.suggestedId, ctx), profile: c.profiles.includes("web") ? "web" : c.profiles[0] ?? "web" })));
     } catch (e) { toast(errMsg(e), "bad"); setRows([]); }
   };
-  useEffect(() => { scan(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // "*" asks the backend to walk every fixed drive (first-run onboarding)
+  useEffect(() => { scan(deep ? ["*"] : undefined); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const addManual = async () => {
     const p = await api.pickFolder();
@@ -49,13 +50,13 @@ export default function ImportWizard({ ctx, onClose }: { ctx: Ctx; onClose: () =
 
   const selCount = (rows ?? []).filter((r) => r.sel).length;
   return (
-    <Modal title="导入现有实例" onClose={busy ? undefined : onClose} footer={done ? <><span className="spacer" /><button className="btn primary" onClick={onClose}>完成</button></> : prog ? <span className="muted small"><span className="spin" /> 导入中…</span> : <><button className="btn" onClick={onClose}>取消</button><button className="btn" onClick={addManual}>手动指定目录…</button><button className="btn" onClick={() => scan()}>重新扫描</button><span className="spacer" /><button className="btn primary" disabled={!selCount} onClick={go}>导入 {selCount} 个</button></>}>
+    <Modal title="导入现有实例" onClose={busy ? undefined : onClose} footer={done ? <><span className="spacer" /><button className="btn primary" onClick={onClose}>完成</button></> : prog ? <span className="muted small"><span className="spin" /> 导入中…</span> : <><button className="btn" onClick={onClose}>取消</button><button className="btn" onClick={addManual}>手动指定目录…</button><button className="btn" onClick={() => scan(["*"])}>扫描全部磁盘</button><span className="spacer" /><button className="btn primary" disabled={!selCount} onClick={go}>导入 {selCount} 个</button></>}>
       {prog ? (
         <>
           <Progress items={prog} />
           {done && <div className="note ok" style={{ marginTop: 12 }}>导入完成。原目录保留为备份；导入的实例已改用受管运行时与端口池端口。原目录自带的 node_modules 可以手动清理。</div>}
         </>
-      ) : rows === null ? <p className="muted"><span className="spin" /> 正在扫描 {ctx.snap.settings.scanRoots.join("、")} 和 ~\.dsh…</p> : (
+      ) : rows === null ? <p className="muted"><span className="spin" /> 正在扫描 {deep ? "所有本地磁盘" : ctx.snap.settings.scanRoots.join("、")} 和 ~\.dsh（最多 3 层，跳过 node_modules）…</p> : (
         <>
           <p className="muted small" style={{ margin: "0 0 12px" }}>找到 {rows.length} 个尚未纳管的 dsh 安装。导入后统一用受管运行时，端口从端口池重新分配。</p>
           {rows.length === 0 && <div className="empty">没有发现未纳管的安装。可以「手动指定目录」，或在「设置」里增加扫描根目录。</div>}

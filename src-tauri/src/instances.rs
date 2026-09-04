@@ -52,12 +52,16 @@ pub fn view(store: &Store, procs: &ProcManager, inst: &Instance) -> InstanceView
     }
 }
 
-fn ensure_runtime(store: &Store, version: &str) -> R<PathBuf> {
-    let s = &store.reg.settings;
-    if !dsh::runtime_installed(&s.rt_root, version) {
-        runtimes::install(&s.rt_root, version, &s.registry)?;
+fn ensure_runtime(store: &mut Store, version: &str) -> R<PathBuf> {
+    let (rt_root, registry) = (store.reg.settings.rt_root.clone(), store.reg.settings.registry.clone());
+    if !dsh::runtime_installed(&rt_root, version) {
+        runtimes::install(&rt_root, version, &registry)?;
     }
-    Ok(dsh::bin_js(&s.rt_root, version))
+    // the first runtime that appears becomes the default for new instances
+    if store.reg.settings.default_runtime.is_none() {
+        store.set_default_runtime(Some(version.to_string()));
+    }
+    Ok(dsh::bin_js(&rt_root, version))
 }
 
 fn pick_port(store: &Store, want: Option<u16>) -> R<u16> {
@@ -132,6 +136,7 @@ pub fn create(store: &mut Store, req: CreateReq) -> R<Instance> {
         auto_start: false,
         notes: String::new(),
         created_at: now_iso(),
+        source: vec![],
     };
 
     // 1. materialise / install profile
@@ -177,9 +182,48 @@ pub fn import(store: &mut Store, req: ImportReq) -> R<Instance> {
         return Err("无法识别该安装的 dsh 版本，请手动填写".into());
     }
     let port = pick_port(store, req.port)?;
+    // Reuse the install's own node_modules as the managed runtime when the
+    // version matches — no download, and it is byte-for-byte what ran before.
+    {
+        let s = &store.reg.settings;
+        if !dsh::runtime_installed(&s.rt_root, &req.runtime) {
+            for src in [Path::new(&req.path).to_path_buf(), src_home.join("profiles")] {
+                if dsh::version_in(&src).as_deref() == Some(req.runtime.as_str()) {
+                    let dst = dsh::runtime_dir(&s.rt_root, &req.runtime);
+                    fs::create_dir_all(&dst).map_err(err)?;
+                    copy_dir(&src.join("node_modules"), &dst.join("node_modules"), &[])?;
+                    if !dst.join("package.json").exists() {
+                        fs::write(dst.join("package.json"), "{\n  \"name\": \"harnessdock-runtime\",\n  \"private\": true\n}\n").map_err(err)?;
+                    }
+                    break;
+                }
+            }
+        }
+    }
     let bin = ensure_runtime(store, &req.runtime)?;
 
-    let home = if req.migrate {
+    // Patches may name bare packages (`@loom/panels`) that live in the install
+    // root's node_modules rather than the profile's; a copied home cannot
+    // resolve them, so such installs are kept in place.
+    let mut forced_in_place: Vec<String> = Vec::new();
+    if req.migrate {
+        let pdir = src_home.join("profiles").join(&req.profile);
+        let deps: Vec<String> = templates::read_deps(&pdir).into_iter().map(|(n, _)| n).collect();
+        if let Ok(t) = fs::read_to_string(pdir.join("cordis.patch.yml")) {
+            for line in t.lines() {
+                let l = line.trim();
+                if let Some(v) = l.strip_prefix("name:") {
+                    let name = v.trim().trim_matches('\'').trim_matches('"').to_string();
+                    let bare = !name.starts_with('.') && !name.starts_with('/') && !name.contains(":\\");
+                    if bare && !name.starts_with("@deepseek-ai/") && !deps.contains(&name) {
+                        forced_in_place.push(name);
+                    }
+                }
+            }
+        }
+    }
+    let migrate = req.migrate && forced_in_place.is_empty();
+    let home = if migrate {
         let dst = store.default_home(&req.id);
         if dst.exists() {
             return Err(format!("目标目录已存在: {}", dst.display()));
@@ -207,9 +251,10 @@ pub fn import(store: &mut Store, req: ImportReq) -> R<Instance> {
         auto_start: false,
         notes: format!("导入自 {}", req.path),
         created_at: now_iso(),
+        source: vec![req.path.clone(), req.home.clone()],
     };
     let pdir = profile_dir(&inst);
-    if req.migrate && !templates::read_deps(&pdir).is_empty() {
+    if migrate && !templates::read_deps(&pdir).is_empty() {
         let s = &store.reg.settings;
         let lock = pdir.join("pnpm-lock.yaml").exists();
         let args: Vec<&str> = if lock { vec!["install", "--frozen-lockfile"] } else { vec!["install"] };
@@ -219,12 +264,18 @@ pub fn import(store: &mut Store, req: ImportReq) -> R<Instance> {
         inst.plugins = templates::plugins_on_disk(&pdir);
     }
     // relative paths that escape the home break after migration — warn loudly
-    if req.migrate {
+    if migrate {
         if let Ok(t) = fs::read_to_string(patch_path(&inst)) {
             if t.contains("name: ../") || t.contains("name: '../") {
                 inst.notes.push_str("\n⚠ patch 里有指向 home 外部的相对路径（../），迁移后可能失效，请检查。");
             }
         }
+    }
+    if !forced_in_place.is_empty() {
+        inst.notes.push_str(&format!(
+            "\nℹ patch 引用了安装根目录里的本地包（{}），复制 home 后无法解析，因此改为原地纳管。",
+            forced_in_place.join(", ")
+        ));
     }
     let dump = init_profile(store, &inst, &bin)?;
     fs::create_dir_all(store.inst_dir(&inst.id)).map_err(err)?;
@@ -289,6 +340,7 @@ pub fn restore(store: &mut Store, id: &str) -> R<Instance> {
         auto_start: false,
         notes: String::new(),
         created_at: now_iso(),
+        source: vec![],
     };
     let pdir = profile_dir(&inst);
     if pdir.is_dir() {

@@ -49,12 +49,12 @@ pub fn adopt_orphans(app: &AppState) {
 }
 
 #[tauri::command]
-pub fn get_snapshot(state: S) -> AppSnapshot {
-    snapshot_of(&state)
+pub async fn get_snapshot(state: S<'_>) -> R<AppSnapshot> {
+    Ok(snapshot_of(&state))
 }
 
 #[tauri::command]
-pub fn save_settings(state: S, settings: Settings) -> R<AppSnapshot> {
+pub async fn save_settings(state: S<'_>, settings: Settings) -> R<AppSnapshot> {
     if settings.pool_start >= settings.pool_end || settings.pool_start < 1024 {
         return Err("端口池范围无效（起点须 ≥ 1024 且小于终点）".into());
     }
@@ -107,14 +107,15 @@ pub async fn instance_stop(state: S<'_>, id: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn instance_logs(state: S, id: String, lines: Option<usize>) -> Vec<String> {
+pub async fn instance_logs(state: S<'_>, id: String, lines: Option<usize>) -> R<Vec<String>> {
     let p = state.store.lock().unwrap().log_path(&id);
-    tail_lines(&p, lines.unwrap_or(200))
+    Ok(tail_lines(&p, lines.unwrap_or(200)))
 }
 
 #[tauri::command]
-pub fn instance_clear_error(state: S, id: String) {
+pub async fn instance_clear_error(state: S<'_>, id: String) -> R<()> {
     state.procs.clear_error(&id);
+    Ok(())
 }
 
 // ---------- instances ----------
@@ -156,25 +157,25 @@ pub async fn instance_delete(state: S<'_>, id: String, hard: bool) -> R<()> {
 }
 
 #[tauri::command]
-pub fn instance_restore(state: S, id: String) -> R<Instance> {
+pub async fn instance_restore(state: S<'_>, id: String) -> R<Instance> {
     let mut store = state.store.lock().unwrap();
     instances::restore(&mut store, &id)
 }
 
 #[tauri::command]
-pub fn instance_purge(state: S, id: String) -> R<()> {
+pub async fn instance_purge(state: S<'_>, id: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     instances::purge(&mut store, &id)
 }
 
 #[tauri::command]
-pub fn instance_update(state: S, id: String, display: Option<String>, cwd: Option<String>, tags: Option<Vec<String>>, auto_start: Option<bool>, notes: Option<String>) -> R<()> {
+pub async fn instance_update(state: S<'_>, id: String, display: Option<String>, cwd: Option<String>, tags: Option<Vec<String>>, auto_start: Option<bool>, notes: Option<String>) -> R<()> {
     let mut store = state.store.lock().unwrap();
     instances::update_meta(&mut store, &id, display, cwd, tags, auto_start, notes)
 }
 
 #[tauri::command]
-pub fn instance_set_port(state: S, id: String, port: Option<u16>) -> R<u16> {
+pub async fn instance_set_port(state: S<'_>, id: String, port: Option<u16>) -> R<u16> {
     if matches!(state.procs.state(&id).status, Status::Running | Status::Starting) {
         return Err("运行中不能换端口，先停止实例".into());
     }
@@ -210,7 +211,7 @@ pub async fn plugin_add(state: S<'_>, id: String, spec: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn plugin_toggle(state: S, id: String, name: String, enabled: bool) -> R<()> {
+pub async fn plugin_toggle(state: S<'_>, id: String, name: String, enabled: bool) -> R<()> {
     let mut store = state.store.lock().unwrap();
     instances::plugin_toggle(&mut store, &id, &name, enabled)
 }
@@ -227,13 +228,13 @@ pub async fn plugin_remove(state: S<'_>, id: String, name: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn patch_read(state: S, id: String) -> R<String> {
+pub async fn patch_read(state: S<'_>, id: String) -> R<String> {
     let store = state.store.lock().unwrap();
     instances::patch_read(&store, &id)
 }
 
 #[tauri::command]
-pub fn patch_write(state: S, id: String, text: String) -> R<()> {
+pub async fn patch_write(state: S<'_>, id: String, text: String) -> R<()> {
     let store = state.store.lock().unwrap();
     instances::patch_write(&store, &id, &text)
 }
@@ -250,13 +251,13 @@ pub async fn instance_validate(state: S<'_>, id: String) -> R<ValidateResult> {
 }
 
 #[tauri::command]
-pub fn model_apply(state: S, id: String, model: Option<ModelRef>) -> R<()> {
+pub async fn model_apply(state: S<'_>, id: String, model: Option<ModelRef>) -> R<()> {
     let mut store = state.store.lock().unwrap();
     instances::apply_model(&mut store, &id, model)
 }
 
 #[tauri::command]
-pub fn default_model_set(state: S, model: ModelRef) -> R<()> {
+pub async fn default_model_set(state: S<'_>, model: ModelRef) -> R<()> {
     let mut store = state.store.lock().unwrap();
     store.provider(&model.provider)?;
     store.reg.default_model = Some(model);
@@ -264,7 +265,7 @@ pub fn default_model_set(state: S, model: ModelRef) -> R<()> {
 }
 
 #[tauri::command]
-pub fn provider_upsert(state: S, provider: Provider) -> R<()> {
+pub async fn provider_upsert(state: S<'_>, provider: Provider) -> R<()> {
     if !valid_id(&provider.id) {
         return Err("提供方 id 只能用小写字母、数字、连字符".into());
     }
@@ -280,7 +281,7 @@ pub fn provider_upsert(state: S, provider: Provider) -> R<()> {
 }
 
 #[tauri::command]
-pub fn provider_delete(state: S, id: String) -> R<()> {
+pub async fn provider_delete(state: S<'_>, id: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     if store.provider(&id)?.builtin {
         return Err("内置提供方不能删除".into());
@@ -308,7 +309,7 @@ pub async fn provider_test(state: S<'_>, id: String) -> R<String> {
 // ---------- env ----------
 
 #[tauri::command]
-pub fn env_set(state: S, id: String, key: String, value: String) -> R<()> {
+pub async fn env_set(state: S<'_>, id: String, key: String, value: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     let inst = store.instance(&id)?.clone();
     crate::envfile::set_env(Path::new(&inst.home), &key, &value)?;
@@ -321,7 +322,7 @@ pub fn env_set(state: S, id: String, key: String, value: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn env_unset(state: S, id: String, key: String) -> R<()> {
+pub async fn env_unset(state: S<'_>, id: String, key: String) -> R<()> {
     let store = state.store.lock().unwrap();
     let inst = store.instance(&id)?;
     crate::envfile::unset_env(Path::new(&inst.home), &key)
@@ -330,7 +331,7 @@ pub fn env_unset(state: S, id: String, key: String) -> R<()> {
 // ---------- ports ----------
 
 #[tauri::command]
-pub fn ports_scan(state: S) -> Vec<PortRow> {
+pub async fn ports_scan(state: S<'_>) -> R<Vec<PortRow>> {
     adopt_orphans(&state);
     let live = ports::listening();
     let store = state.store.lock().unwrap();
@@ -348,16 +349,16 @@ pub fn ports_scan(state: S) -> Vec<PortRow> {
         }
     }
     rows.sort_by_key(|r| r.port);
-    rows
+    Ok(rows)
 }
 
 #[tauri::command]
-pub fn process_info(pid: u32) -> Option<String> {
-    ports::cmdline(pid)
+pub async fn process_info(pid: u32) -> R<Option<String>> {
+    Ok(ports::cmdline(pid))
 }
 
 #[tauri::command]
-pub fn process_kill(pid: u32) -> R<()> {
+pub async fn process_kill(pid: u32) -> R<()> {
     ports::kill_tree(pid)
 }
 
@@ -384,7 +385,7 @@ pub async fn runtime_install(state: S<'_>, version: String) -> R<String> {
 }
 
 #[tauri::command]
-pub fn runtime_remove(state: S, version: String) -> R<()> {
+pub async fn runtime_remove(state: S<'_>, version: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     if store.reg.instances.iter().any(|i| i.runtime == version) {
         return Err("仍有实例在用这个版本".into());
@@ -398,7 +399,7 @@ pub fn runtime_remove(state: S, version: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn runtime_set_default(state: S, version: String) -> R<()> {
+pub async fn runtime_set_default(state: S<'_>, version: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     if !dsh::runtime_installed(&store.reg.settings.rt_root, &version) {
         return Err("该版本未安装".into());
@@ -444,13 +445,13 @@ pub async fn template_capture(state: S<'_>, id: String, name: String, include_ho
 }
 
 #[tauri::command]
-pub fn template_delete(state: S, id: String) -> R<()> {
+pub async fn template_delete(state: S<'_>, id: String) -> R<()> {
     let mut store = state.store.lock().unwrap();
     templates::delete(&mut store, &id)
 }
 
 #[tauri::command]
-pub fn template_baseline(state: S, id: String) -> R<String> {
+pub async fn template_baseline(state: S<'_>, id: String) -> R<String> {
     let store = state.store.lock().unwrap();
     templates::baseline(&store, &id)
 }
@@ -465,13 +466,21 @@ pub async fn discover_scan(state: S<'_>, extra_roots: Option<Vec<String>>) -> R<
             let s = app.store.lock().unwrap();
             (
                 s.reg.settings.scan_roots.clone(),
-                s.reg.instances.iter().map(|i| i.home.clone()).collect::<Vec<_>>(),
+                s.reg.instances.iter().flat_map(|i| std::iter::once(i.home.clone()).chain(i.source.iter().cloned())).collect::<Vec<_>>(),
                 s.reg.settings.rt_root.clone(),
             )
         };
         if let Some(e) = extra_roots {
-            roots.extend(e);
+            for r in e {
+                if r == "*" {
+                    roots.extend(discover::fixed_drives());
+                } else {
+                    roots.push(r);
+                }
+            }
         }
+        roots.sort();
+        roots.dedup();
         Ok(discover::scan(&roots, &known, &rt_root))
     })
     .await
@@ -479,7 +488,7 @@ pub async fn discover_scan(state: S<'_>, extra_roots: Option<Vec<String>>) -> R<
 }
 
 #[tauri::command]
-pub fn detect_install(path: String) -> R<Candidate> {
+pub async fn detect_install(path: String) -> R<Candidate> {
     let p = Path::new(&path);
     if !p.is_dir() {
         return Err("目录不存在".into());
@@ -489,7 +498,7 @@ pub fn detect_install(path: String) -> R<Candidate> {
 }
 
 #[tauri::command]
-pub fn app_paths(state: S, id: String) -> R<serde_json::Value> {
+pub async fn app_paths(state: S<'_>, id: String) -> R<serde_json::Value> {
     let store = state.store.lock().unwrap();
     let inst = store.instance(&id)?;
     Ok(serde_json::json!({
