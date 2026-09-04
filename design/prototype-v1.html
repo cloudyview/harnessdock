@@ -1,0 +1,738 @@
+<title>DSH Manager</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EEF0F5; --surface:#FFFFFF; --surface-2:#F6F7FA; --ink:#1B1F2A; --ink-2:#4B5165; --muted:#7B8197; --line:#D9DDE8; --line-2:#E8EBF2;
+  --accent:#3B56E8; --accent-ink:#FFFFFF; --accent-soft:#E8ECFD;
+  --ok:#1F9D63; --ok-soft:#E1F5EA; --warn:#C9811A; --warn-soft:#FBF0DC; --bad:#D5423A; --bad-soft:#FBE5E3; --idle:#8A90A6; --idle-soft:#ECEEF3;
+  --rail:#1A1E2B; --rail-ink:#C9CDDB; --rail-active:#2A3044; --rail-accent:#8FA0FF;
+  --shadow:0 10px 30px rgba(20,25,45,.14);
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --sans:'IBM Plex Sans','Noto Sans SC','Microsoft YaHei','PingFang SC',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1118; --surface:#171A24; --surface-2:#1E222E; --ink:#E7E9F0; --ink-2:#B8BDCE; --muted:#8087A0; --line:#2A2F40; --line-2:#232838;
+    --accent:#7288FF; --accent-ink:#0F1118; --accent-soft:#232B4D;
+    --ok:#3FBF7F; --ok-soft:#173226; --warn:#E0A03A; --warn-soft:#33281A; --bad:#EF6B63; --bad-soft:#3A1F1E; --idle:#7C839A; --idle-soft:#242838;
+    --rail:#0B0D13; --rail-ink:#AEB3C6; --rail-active:#1C2030; --rail-accent:#8FA0FF;
+    --shadow:0 12px 36px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1118; --surface:#171A24; --surface-2:#1E222E; --ink:#E7E9F0; --ink-2:#B8BDCE; --muted:#8087A0; --line:#2A2F40; --line-2:#232838;
+  --accent:#7288FF; --accent-ink:#0F1118; --accent-soft:#232B4D;
+  --ok:#3FBF7F; --ok-soft:#173226; --warn:#E0A03A; --warn-soft:#33281A; --bad:#EF6B63; --bad-soft:#3A1F1E; --idle:#7C839A; --idle-soft:#242838;
+  --rail:#0B0D13; --rail-ink:#AEB3C6; --rail-active:#1C2030; --rail-accent:#8FA0FF;
+  --shadow:0 12px 36px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:100%}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+h2{font-size:17px}
+h3{font-size:14px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+
+/* ---------- window frame ---------- */
+.window{max-width:1360px;margin:24px auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;min-height:820px;display:grid;grid-template-rows:38px 1fr}
+.titlebar{display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--rail);color:var(--rail-ink);font-size:12px;user-select:none}
+.titlebar .dots{display:flex;gap:6px}.titlebar .dots i{width:11px;height:11px;border-radius:50%;background:#3A3F52;display:block}
+.titlebar .name{font-weight:600;color:#fff;letter-spacing:.02em}
+.titlebar .proto{margin-left:auto;font-family:var(--mono);font-size:11px;padding:2px 8px;border:1px solid #3A3F52;border-radius:4px;color:#9FA5BA}
+.frame{display:grid;grid-template-columns:196px 1fr;min-height:0}
+
+/* ---------- rail ---------- */
+.rail{background:var(--rail);color:var(--rail-ink);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.rail .grp{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#6C7288;padding:14px 10px 6px}
+.rail button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:8px 10px;color:var(--rail-ink);font-size:13px}
+.rail button:hover{background:var(--rail-active)}
+.rail button.active{background:var(--rail-active);color:#fff;box-shadow:inset 3px 0 0 var(--rail-accent)}
+.rail button .ic{width:16px;height:16px;flex:none;opacity:.85}
+.rail .cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:#8A90A6}
+.rail .foot{margin-top:auto;padding:10px;font-size:11px;color:#6C7288;line-height:1.5}
+
+/* ---------- main ---------- */
+.main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--surface)}
+.topbar h2{font-size:16px}
+.topbar .sub{color:var(--muted);font-size:12.5px}
+.topbar .spacer{flex:1}
+.content{padding:18px 22px 28px;overflow:auto;flex:1}
+.view[hidden]{display:none}
+
+/* summary strip */
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.strip .tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;display:flex;align-items:baseline;gap:10px}
+.strip .tile b{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.strip .tile span{color:var(--muted);font-size:12px}
+.strip .tile.ok b{color:var(--ok)}.strip .tile.bad b{color:var(--bad)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 11px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn .ic{width:13px;height:13px}
+
+/* instance list */
+.list{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:4px 1fr 118px 110px 90px 1.1fr auto;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0 14px 0 0;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.row:hover{border-color:var(--accent)}
+.row.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.row .stripe{align-self:stretch;background:var(--idle)}
+.row.running .stripe{background:var(--ok)}.row.error .stripe{background:var(--bad)}.row.starting .stripe,.row.stopping .stripe{background:var(--warn)}
+.row .cell{padding:12px 0;min-width:0}
+.row .nm{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.row .desc{color:var(--muted);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .path{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .acts{display:flex;gap:6px;justify-content:flex-end}
+.lbl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:var(--idle-soft);color:var(--ink-2)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--idle);display:block}
+.pill.running{background:var(--ok-soft);color:var(--ok)}.pill.running i{background:var(--ok)}
+.pill.error{background:var(--bad-soft);color:var(--bad)}.pill.error i{background:var(--bad)}
+.pill.starting,.pill.stopping{background:var(--warn-soft);color:var(--warn)}.pill.starting i,.pill.stopping i{background:var(--warn);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.pill i{animation:none}}
+.tag{font-size:11px;padding:1px 7px;border-radius:4px;background:var(--accent-soft);color:var(--accent);font-weight:500}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* table */
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.mono{font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;border-radius:8px}
+
+/* cards grid (templates / runtimes / providers) */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.card .hd{display:flex;align-items:flex-start;gap:8px}
+.card .hd h3{flex:1}
+.card .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px}
+.card .kv span:nth-child(odd){color:var(--muted)}
+.card .ft{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+
+/* section */
+.sec{margin-bottom:22px}
+.sec .sh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sec .sh h3{font-size:14px}
+.sec .sh .spacer{flex:1}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.form{display:grid;grid-template-columns:150px 1fr;gap:12px 16px;align-items:center}
+.form label{color:var(--ink-2);font-size:12.5px}
+.form .hint{grid-column:2;color:var(--muted);font-size:12px;margin-top:-6px}
+.inline{display:flex;gap:8px;align-items:center}
+.inline input,.inline select{width:auto;flex:1}
+
+/* drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:560px;max-width:96vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:30;transform:translateX(0);transition:transform .2s}
+.drawer[hidden]{display:none}
+.drawer .dh{padding:16px 20px 0;border-bottom:1px solid var(--line)}
+.drawer .dh .t{display:flex;align-items:center;gap:10px}
+.drawer .dh h2{flex:1}
+.drawer .dh .meta{color:var(--muted);font-size:12px;margin:4px 0 12px}
+.tabs{display:flex;gap:2px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--muted);font-size:13px;font-weight:500;margin-bottom:-1px}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.drawer .db{padding:16px 20px;overflow:auto;flex:1}
+.drawer .df{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:8px;background:var(--surface-2)}
+.log{background:#0E1017;color:#C9D1E3;font-family:var(--mono);font-size:12px;line-height:1.55;padding:12px 14px;border-radius:6px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.log .t{color:#6F7790}.log .ok{color:#5FD39A}.log .err{color:#FF7B73}.log .url{color:#9FB0FF}
+.kvlist{display:grid;grid-template-columns:130px 1fr;gap:8px 14px;font-size:13px}
+.kvlist span:nth-child(odd){color:var(--muted)}
+.kvlist .mono{word-break:break-all}
+.plug{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)}
+.plug:last-child{border-bottom:0}
+.plug .n{flex:1;min-width:0}.plug .n b{font-weight:500;font-family:var(--mono);font-size:12.5px}
+.plug .n div{color:var(--muted);font-size:12px}
+.switch{width:34px;height:20px;border-radius:999px;background:var(--idle);position:relative;border:0;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.switch.on{background:var(--ok)}.switch.on::after{left:16px}
+textarea.code{font-family:var(--mono);font-size:12px;line-height:1.5;min-height:260px;background:var(--surface-2)}
+.note{border-left:3px solid var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:0 6px 6px 0;font-size:12.5px;color:var(--ink-2)}
+.note.ok{border-color:var(--ok);background:var(--ok-soft)}
+.note.bad{border-color:var(--bad);background:var(--bad-soft)}
+.envrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.envrow:last-child{border-bottom:0}
+.envrow code{flex:1}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--idle);display:inline-block}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,12,20,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.scrim[hidden]{display:none}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:10px;width:720px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.modal.narrow{width:460px}
+.modal .mh{padding:16px 20px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal .mh h2{flex:1}
+.modal .mb{padding:18px 20px;overflow:auto}
+.modal .mf{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:var(--surface-2);border-radius:0 0 10px 10px}
+.modal .mf .spacer{flex:1}
+.steps{display:flex;gap:0;margin-bottom:18px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.steps div{flex:1;padding:7px 10px;font-size:12px;color:var(--muted);background:var(--surface-2);border-right:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.steps div:last-child{border-right:0}
+.steps div.cur{color:var(--accent);background:var(--accent-soft);font-weight:500}
+.steps div.done{color:var(--ok)}
+.steps div b{font-family:var(--mono);font-weight:500;font-size:11px}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choice label{border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+.choice label:hover{border-color:var(--accent)}
+.choice label.sel{border-color:var(--accent);background:var(--accent-soft)}
+.choice input{width:auto;margin-top:3px}
+.choice b{display:block;font-weight:600}
+.choice span{color:var(--muted);font-size:12px}
+.progress{display:flex;flex-direction:column;gap:6px}
+.progress div{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:6px;background:var(--surface-2);font-size:12.5px}
+.progress div .st{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none}
+.progress div.doing .st{border-color:var(--warn);border-top-color:transparent;animation:spin .8s linear infinite}
+.progress div.done .st{border-color:var(--ok);background:var(--ok)}
+.progress div.fail .st{border-color:var(--bad);background:var(--bad)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.check{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--surface)}
+.check input{width:auto}
+.check .n{flex:1}.check .n b{font-weight:500}.check .n div{color:var(--muted);font-size:12px;font-family:var(--mono)}
+
+/* toasts */
+.toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:60}
+.toast{background:var(--rail);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;box-shadow:var(--shadow);max-width:380px;display:flex;gap:10px;align-items:center;animation:up .2s ease-out}
+.toast.ok{box-shadow:inset 3px 0 0 var(--ok),var(--shadow)}.toast.bad{box-shadow:inset 3px 0 0 var(--bad),var(--shadow)}
+@keyframes up{from{transform:translateY(8px);opacity:0}}
+
+/* ports */
+.pool{display:grid;grid-template-columns:repeat(64,1fr);gap:2px;margin-top:10px}
+.pool i{display:block;height:8px;border-radius:1px;background:var(--idle-soft);border:1px solid var(--line-2)}
+.pool i.used{background:var(--accent);border-color:var(--accent)}
+.pool i.run{background:var(--ok);border-color:var(--ok)}
+.pool i.ext{background:var(--bad);border-color:var(--bad)}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+
+@media (max-width:1000px){.row{grid-template-columns:4px 1fr auto;}.row .cell.hide{display:none}.frame{grid-template-columns:60px 1fr}.rail button span,.rail .grp,.rail .foot,.rail .cnt{display:none}.strip{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="window">
+  <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="name">DSH Manager</span><span class="muted" style="color:#6C7288">DeepSeek Harness 实例管理</span><span class="proto">交互原型 · 示例数据 · v1</span></div>
+  <div class="frame">
+    <nav class="rail" id="rail">
+      <div class="grp">管理</div>
+      <button data-view="instances" class="active"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="4" rx="1"/><rect x="2" y="10" width="12" height="4" rx="1"/></svg><span>实例</span><b class="cnt" id="cnt-inst"></b></button>
+      <button data-view="templates"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h7l3 3v7H3z"/><path d="M10 3v3h3"/></svg><span>模板</span><b class="cnt" id="cnt-tpl"></b></button>
+      <button data-view="ports"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 2v12M2 8h12"/></svg><span>端口</span></button>
+      <div class="grp">配置</div>
+      <button data-view="models"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-8 4 8M4 10h4M11 4l3 8"/></svg><span>模型</span></button>
+      <button data-view="runtimes"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l6 3v6l-6 3-6-3V5z"/><path d="M8 8l6-3M8 8v6M8 8L2 5"/></svg><span>运行时</span><b class="cnt" id="cnt-rt"></b></button>
+      <button data-view="settings"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg><span>设置</span></button>
+      <div class="foot">运行时 <span class="mono">rc.2</span> 默认<br>端口池 <span class="mono" id="foot-pool"></span></div>
+    </nav>
+
+    <div class="main">
+      <div class="topbar">
+        <div><h2 id="tb-title">实例</h2><div class="sub" id="tb-sub"></div></div>
+        <div class="spacer"></div>
+        <div id="tb-actions"></div>
+      </div>
+      <div class="content">
+        <section class="view" id="view-instances"></section>
+        <section class="view" id="view-templates" hidden></section>
+        <section class="view" id="view-ports" hidden></section>
+        <section class="view" id="view-models" hidden></section>
+        <section class="view" id="view-runtimes" hidden></section>
+        <section class="view" id="view-settings" hidden></section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" hidden></aside>
+<div class="scrim" id="scrim" hidden><div class="modal" id="modal"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ============ 示例状态（基于本机真实实例改编） ============ */
+const S = {
+  settings:{instRoot:'D:\\harnessdock\\instances', wsRoot:'D:\\harnessdock\\workspaces', rtRoot:'D:\\harnessdock\\instances\\.runtimes', pool:[41000,42023], registry:'https://registry.npmjs.org/', trashDays:7, autostart:false, defaultRuntime:'0.1.1-rc.2'},
+  runtimes:[
+    {ver:'0.1.1-rc.2', installed:'2026-08-28', size:'259 MB', note:'当前默认，全部实例在用'},
+    {ver:'0.1.1-rc.3', installed:'2026-09-03', size:'263 MB', note:'金丝雀验证中，尚无实例使用'},
+  ],
+  providers:[
+    {id:'deepseek', name:'DeepSeek 官方', api:'deepseek', baseURL:'https://api.deepseek.com', keyEnv:'DEEPSEEK_API_KEY', keySet:true, models:['deepseek-chat','deepseek-reasoner']},
+    {id:'siliconflow', name:'SiliconFlow', api:'openai-completions', baseURL:'https://api.siliconflow.cn/v1', keyEnv:'SILICONFLOW_API_KEY', keySet:true, models:['deepseek-ai/DeepSeek-V3','Qwen/Qwen3-235B-A22B']},
+    {id:'openrouter', name:'OpenRouter', api:'openai-completions', baseURL:'https://openrouter.ai/api/v1', keyEnv:'OPENROUTER_API_KEY', keySet:false, models:['anthropic/claude-sonnet-5','google/gemini-3.1-pro-preview']},
+  ],
+  defaultModel:{provider:'deepseek', model:'deepseek-chat'},
+  templates:[
+    {id:'blank-web', name:'空白 Web', builtin:true, rt:'0.1.1-rc.2', profile:'web', bundles:['dsh-base','dsh-web-app'], plugins:[], env:['DEEPSEEK_API_KEY'], desc:'官方 web profile 原样，浏览器界面。', captured:'—'},
+    {id:'blank-headless', name:'空白 Headless', builtin:true, rt:'0.1.1-rc.2', profile:'headless', bundles:['dsh-base','dsh-headless'], plugins:[], env:['DEEPSEEK_API_KEY'], desc:'无界面，一条命令进、干完退出。配任务计划程序做例行。', captured:'—'},
+    {id:'company', name:'公司岗位', builtin:false, rt:'0.1.1-rc.2', profile:'web', bundles:['dsh-base','dsh-web-app','dsh-subagent-claude-code'], plugins:['@deepseek-ai/dsh-subagent-claude-code@0.1.1-rc.2','./my-ledger/index.mjs'], env:['DEEPSEEK_API_KEY','SILICONFLOW_API_KEY','ANTHROPIC_BASE_URL'], desc:'从 company 实例捕获：6 位顾问 persona、公司总账插件、日报 SOP 技能。', captured:'2026-09-01'},
+    {id:'biz-ops', name:'运营业务线（headless）', builtin:false, rt:'0.1.1-rc.2', profile:'biz-ops', bundles:['dsh-base','dsh-headless','dsh-subagent-claude-code'], plugins:['@deepseek-ai/dsh-subagent-claude-code@0.1.1-rc.2'], env:['DEEPSEEK_API_KEY','SILICONFLOW_API_KEY'], desc:'运营专员 persona + SiliconFlow 路由 + 日报技能。', captured:'2026-08-27'},
+  ],
+  instances:[
+    {id:'company', name:'company', display:'公司实例', status:'running', port:41101, pid:24816, profile:'web', rt:'0.1.1-rc.2', home:'D:\\harnessdock\\instances\\company\\home', cwd:'D:\\work\\company-biz', tags:['生产','锁版本'], tpl:'company', model:null,
+      plugins:[{name:'@deepseek-ai/dsh-subagent-claude-code',ver:'0.1.1-rc.2',on:true,kind:'npm'},{name:'./my-ledger/index.mjs',ver:'本地',on:true,kind:'local'},{name:'@deepseek-ai/dsh-tool-web',ver:'0.1.1-rc.2',on:false,kind:'npm'}],
+      env:{DEEPSEEK_API_KEY:true,SILICONFLOW_API_KEY:true,ANTHROPIC_BASE_URL:true}, started:'今天 09:12', sessions:38,
+      logs:['<span class="t">09:12:01</span> dsh boot: profile web, home D:\\harnessdock\\instances\\company\\home','<span class="t">09:12:02</span> loader: 214 rows composed, 0 disabled','<span class="t">09:12:03</span> <span class="ok">dsh web:</span> <span class="url">http://127.0.0.1:41101</span>','<span class="t">09:40:17</span> session s_2026-09-04_0940 opened (web)']},
+    {id:'canary', name:'canary', display:'金丝雀（通用入口）', status:'stopped', port:41100, pid:null, profile:'web', rt:'0.1.1-rc.2', home:'D:\\harnessdock\\instances\\canary\\home', cwd:'D:\\harnessdock\\workspaces\\canary', tags:['金丝雀'], tpl:'blank-web', model:null,
+      plugins:[], env:{DEEPSEEK_API_KEY:true}, started:null, sessions:12,
+      logs:['<span class="t">昨天 22:05</span> shutdown: SIGTERM received, 1 session flushed']},
+    {id:'movieflow', name:'movieflow', display:'MovieFlow 业务线', status:'error', port:41103, pid:null, profile:'web', rt:'0.1.1-rc.2', home:'D:\\harnessdock\\instances\\movieflow\\home', cwd:'D:\\work\\movieflow-platform', tags:['业务线'], tpl:'company', model:{provider:'siliconflow',model:'deepseek-ai/DeepSeek-V3'},
+      plugins:[{name:'@deepseek-ai/dsh-subagent-claude-code',ver:'0.1.1-rc.2',on:true,kind:'npm'}], env:{DEEPSEEK_API_KEY:true,SILICONFLOW_API_KEY:false}, started:null, sessions:5, lastError:'启动失败：模型路由 siliconflow 需要 SILICONFLOW_API_KEY，但该实例的 .env 里没有。',
+      logs:['<span class="t">08:55:40</span> dsh boot: profile web','<span class="t">08:55:41</span> <span class="err">error:</span> credential SILICONFLOW_API_KEY not found (checked env, .credentials.yaml, .env)','<span class="t">08:55:41</span> <span class="err">exit code 1</span>']},
+  ],
+  discovered:[
+    {id:'loom', name:'dsh-loom', path:'D:\\old-dsh\\dsh-loom', home:'D:\\old-dsh\\dsh-loom\\home', rt:'0.1.1-rc.2', port:null, profiles:['web'], size:'312 MB', sel:true},
+    {id:'lab', name:'旧实验室 lab', path:'D:\\old-dsh\\lab', home:'D:\\old-dsh\\lab\\home', rt:'0.1.1-rc.2', port:3081, profiles:['web','headless','biz-demo','biz-ops'], size:'188 MB', sel:true},
+  ],
+  external:[{port:41105, pid:18820, proc:'node.exe（非 DSH）'}],
+  trash:[],
+  view:'instances', sel:null, tab:'overview',
+};
+const patchText = i => `# ${i.name} — profile/${i.profile}/cordis.patch.yml
+# 由 DSH Manager 维护的区块以 "dshm:" 注释标记，手写内容不会被改动。
+
+- id: system-prompt
+  config:
+    persona: >-
+      你是"${i.display}"的助理，使用 {{model}} 模型，工作目录 {{cwd}}。
+${i.model ? `
+# dshm:model — 由「模型」页应用
+- id: agent-default-model
+  config:
+    provider: ${i.model.provider}
+    model: ${i.model.model}
+` : ''}${i.plugins.filter(p=>p.on).map(p=>`
+# dshm:plugin ${p.name}
+- insert:
+    - id: ${p.name.replace(/^@deepseek-ai\/dsh-|^\.\/|\/index\.mjs$/g,'')}
+      name: '${p.name}'`).join('\n')}
+`;
+
+/* ============ 基础工具 ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const now = () => new Date().toTimeString().slice(0,8);
+function toast(msg, kind=''){ const t=document.createElement('div'); t.className='toast '+kind; t.innerHTML=msg; $('#toasts').appendChild(t); setTimeout(()=>t.remove(), 3200); }
+const inst = id => S.instances.find(i=>i.id===id);
+const stName = {running:'运行中',stopped:'已停止',starting:'启动中',stopping:'停止中',error:'异常'};
+function nextPort(){ const used=new Set([...S.instances.map(i=>i.port),...S.external.map(e=>e.port)]); for(let p=S.settings.pool[0];p<=S.settings.pool[1];p++) if(!used.has(p)) return p; return null; }
+function log(i, line, cls=''){ i.logs.push(`<span class="t">${now()}</span> ${cls?`<span class="${cls}">`:''}${line}${cls?'</span>':''}`); if(i.logs.length>60) i.logs.shift(); }
+
+/* ============ 进程动作（模拟） ============ */
+function start(id){
+  const i=inst(id); if(!i||i.status==='running'||i.status==='starting') return;
+  const missing=Object.entries(i.env).filter(([k,v])=>!v).map(([k])=>k);
+  const ext=S.external.find(e=>e.port===i.port);
+  if(ext){ i.status='error'; i.lastError=`端口 ${i.port} 被 PID ${ext.pid}（${ext.proc}）占用。DSH 遇到端口冲突会直接退出，请在「端口」页重新分配。`; log(i,`error: listen EADDRINUSE 127.0.0.1:${i.port}`,'err'); render(); toast(`${i.name} 启动失败：端口冲突`,'bad'); return; }
+  i.status='starting'; i.lastError=null; log(i,`dsh boot: profile ${i.profile}, home ${i.home}`); render(); toast(`正在启动 ${i.name}…`);
+  setTimeout(()=>{ log(i,'loader: rows composed from bundles → profile patch → home patch'); render(); },600);
+  setTimeout(()=>{
+    if(missing.length){ i.status='error'; i.lastError=`启动失败：缺少凭证 ${missing.join(', ')}。到「模型」页或实例详情的「凭证」补齐。`; log(i,`error: credential ${missing[0]} not found`,'err'); log(i,'exit code 1','err'); toast(`${i.name} 启动失败：缺少 ${missing[0]}`,'bad'); }
+    else { i.status='running'; i.pid=20000+Math.floor(Math.random()*9000); i.started='刚刚'; log(i,`<span class="ok">dsh web:</span> <span class="url">http://127.0.0.1:${i.port}</span>`); toast(`${i.name} 已就绪 · http://127.0.0.1:${i.port}`,'ok'); }
+    render();
+  },1700);
+}
+function stop(id, cb){
+  const i=inst(id); if(!i||i.status!=='running') { cb&&cb(); return; }
+  i.status='stopping'; log(i,'shutdown: sending SIGTERM, then taskkill /T for the process tree'); render();
+  setTimeout(()=>{ i.status='stopped'; i.pid=null; i.started=null; log(i,'shutdown: 1 session flushed, port released'); render(); toast(`${i.name} 已停止`); cb&&cb(); },1100);
+}
+function restart(id){ const i=inst(id); if(i.status==='running') stop(id,()=>setTimeout(()=>start(id),200)); else start(id); }
+function openUrl(id){ const i=inst(id); if(i.status!=='running'){ toast('实例未运行，先启动它','bad'); return;} toast(`已在默认浏览器打开 http://127.0.0.1:${i.port}`,'ok'); }
+
+/* ============ 渲染 ============ */
+function render(){
+  document.querySelectorAll('#rail button').forEach(b=>b.classList.toggle('active',b.dataset.view===S.view));
+  document.querySelectorAll('.view').forEach(v=>v.hidden = v.id!=='view-'+S.view);
+  $('#cnt-inst').textContent=S.instances.length; $('#cnt-tpl').textContent=S.templates.length; $('#cnt-rt').textContent=S.runtimes.length;
+  $('#foot-pool').textContent=`${S.settings.pool[0]}–${S.settings.pool[1]}`;
+  ({instances:rInstances,templates:rTemplates,ports:rPorts,models:rModels,runtimes:rRuntimes,settings:rSettings})[S.view]();
+  renderDrawer();
+}
+function topbar(title, sub, actions){ $('#tb-title').textContent=title; $('#tb-sub').textContent=sub; $('#tb-actions').innerHTML=actions; }
+
+function rInstances(){
+  const run=S.instances.filter(i=>i.status==='running').length, err=S.instances.filter(i=>i.status==='error').length;
+  topbar('实例', `${S.instances.length} 个实例 · ${run} 个运行中`, `<button class="btn" data-act="import">导入现有实例</button> <button class="btn primary" data-act="new">＋ 新建实例</button>`);
+  const used=S.instances.length, poolN=S.settings.pool[1]-S.settings.pool[0]+1;
+  $('#view-instances').innerHTML = `
+    <div class="strip">
+      <div class="tile ok"><b>${run}</b><span>运行中</span></div>
+      <div class="tile"><b>${S.instances.length-run-err}</b><span>已停止</span></div>
+      <div class="tile ${err?'bad':''}"><b>${err}</b><span>异常，需要处理</span></div>
+      <div class="tile"><b>${used}<span style="font-size:13px;color:var(--muted)"> / ${poolN}</span></b><span>端口池已用</span></div>
+    </div>
+    <div class="list">${S.instances.map(i=>`
+      <div class="row ${i.status} ${S.sel===i.id?'sel':''}" data-open="${i.id}">
+        <div class="stripe"></div>
+        <div class="cell"><div class="nm">${esc(i.name)} ${i.tags.map(t=>`<span class="tag ${t==='金丝雀'?'warn':''}">${t}</span>`).join('')}</div><div class="desc">${esc(i.display)}${i.lastError?` · <span style="color:var(--bad)">${esc(i.lastError.split('：')[0])}</span>`:''}</div></div>
+        <div class="cell"><span class="lbl">状态</span><span class="pill ${i.status}"><i></i>${stName[i.status]}</span></div>
+        <div class="cell hide"><span class="lbl">端口</span><span class="mono">127.0.0.1:${i.port}</span></div>
+        <div class="cell hide"><span class="lbl">运行时</span><span class="mono">${i.rt}</span></div>
+        <div class="cell hide"><span class="lbl">工作目录</span><div class="path" title="${esc(i.cwd)}">${esc(i.cwd)}</div></div>
+        <div class="cell acts" data-stop>
+          ${i.status==='running'?`<button class="btn sm" data-act="open" data-id="${i.id}">打开</button><button class="btn sm" data-act="restart" data-id="${i.id}">重启</button><button class="btn sm" data-act="stop" data-id="${i.id}">停止</button>`
+          : i.status==='starting'||i.status==='stopping'?`<button class="btn sm" disabled>${stName[i.status]}…</button>`
+          : `<button class="btn sm primary" data-act="start" data-id="${i.id}">启动</button><button class="btn sm ghost" data-act="detail" data-id="${i.id}">详情</button>`}
+        </div>
+      </div>`).join('')}
+    </div>
+    ${S.trash.length?`<p class="muted small" style="margin-top:14px">回收站里有 ${S.trash.length} 个实例（${S.settings.trashDays} 天后自动清理）。<a href="#" data-act="settings-trash">去查看</a></p>`:''}`;
+}
+
+function rTemplates(){
+  topbar('模板', '模板 = 运行时版本 + profile 配置 + home 级设定的快照，不含会话与凭证', `<button class="btn" data-act="capture">从实例捕获模板</button> <button class="btn primary" data-act="new">用模板新建实例</button>`);
+  $('#view-templates').innerHTML = `<div class="grid">${S.templates.map(t=>`
+    <div class="card">
+      <div class="hd"><h3>${esc(t.name)}</h3>${t.builtin?'<span class="tag">内置</span>':'<span class="tag warn">自定义</span>'}</div>
+      <p class="muted small" style="margin:0">${esc(t.desc)}</p>
+      <div class="kv"><span>运行时</span><span class="mono">${t.rt}</span><span>Profile</span><span class="mono">${t.profile}</span><span>Bundles</span><span class="mono">${t.bundles.join(' · ')}</span><span>插件</span><span>${t.plugins.length?t.plugins.map(p=>`<code>${esc(p)}</code>`).join('<br>'):'—'}</span><span>需要凭证</span><span>${t.env.map(e=>`<code>${e}</code>`).join(' ')}</span><span>捕获时间</span><span>${t.captured}</span></div>
+      <div class="ft"><button class="btn sm primary" data-act="new" data-tpl="${t.id}">用此模板新建</button>${t.builtin?'':`<button class="btn sm" data-act="tpl-diff" data-tpl="${t.id}">查看基线 dump</button><button class="btn sm ghost danger" data-act="tpl-del" data-tpl="${t.id}">删除</button>`}</div>
+    </div>`).join('')}</div>`;
+}
+
+function rPorts(){
+  topbar('端口', `端口池 ${S.settings.pool[0]}–${S.settings.pool[1]} · 启动前探测，冲突就拦下，不让 DSH 自己撞`, `<button class="btn" data-act="scan">重新探测占用</button>`);
+  const rows=[...S.instances.map(i=>({port:i.port,who:i.name,kind:'inst',status:i.status,pid:i.pid,i})),...S.external.map(e=>({port:e.port,who:e.proc,kind:'ext',status:'占用',pid:e.pid}))].sort((a,b)=>a.port-b.port);
+  const used=new Map(rows.map(r=>[r.port,r]));
+  $('#view-ports').innerHTML = `
+    <div class="sec"><div class="panel">
+      <div class="inline"><b>端口池</b><span class="mono">${S.settings.pool[0]}</span><span class="muted">–</span><span class="mono">${S.settings.pool[1]}</span><span class="muted small">（1024 个，5 位端口避开常用段；可在「设置」修改）</span></div>
+      <div class="pool">${Array.from({length:1024},(_,k)=>{const p=S.settings.pool[0]+k, r=used.get(p); return `<i title="${p}${r?' · '+r.who:''}" class="${r?(r.kind==='ext'?'ext':r.status==='running'?'run':'used'):''}"></i>`}).join('')}</div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>运行中</span><span><i style="background:var(--accent)"></i>已分配</span><span><i style="background:var(--bad)"></i>外部进程占用</span><span><i style="background:var(--idle-soft);border:1px solid var(--line)"></i>空闲</span></div>
+    </div></div>
+    <div class="sec"><div class="sh"><h3>分配表</h3></div>
+    <div class="tablewrap"><table><thead><tr><th>端口</th><th>归属</th><th>状态</th><th>PID</th><th>探活</th><th></th></tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td class="mono">${r.port}</td>
+        <td>${r.kind==='ext'?`<span style="color:var(--bad)">${esc(r.who)}</span>`:`<b>${esc(r.who)}</b> <span class="muted small">${esc(r.i.display)}</span>`}</td>
+        <td>${r.kind==='ext'?'<span class="pill error"><i></i>非本管理器进程</span>':`<span class="pill ${r.status}"><i></i>${stName[r.status]}</span>`}</td>
+        <td class="mono">${r.pid??'—'}</td>
+        <td>${r.kind==='inst'&&r.status==='running'?'<span class="dot ok"></span> HTTP 200':r.kind==='ext'?'<span class="dot bad"></span> 不是 DSH':'<span class="dot"></span> —'}</td>
+        <td style="text-align:right">${r.kind==='inst'?`<button class="btn sm" data-act="reassign" data-id="${r.i.id}">重新分配</button>`:`<button class="btn sm" data-act="ext-kill" data-port="${r.port}">查看进程</button>`}</td>
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+function rModels(){
+  topbar('模型', '统一维护模型提供方与默认模型；每个实例可覆盖。应用时写入该实例的 patch 文件两行。', `<button class="btn" data-act="add-provider">＋ 添加提供方</button>`);
+  const dp=S.providers.find(p=>p.id===S.defaultModel.provider);
+  $('#view-models').innerHTML = `
+    <div class="sec"><div class="sh"><h3>提供方</h3><span class="muted small">API Key 的值不在这里保存，只登记环境变量名；值从 密钥库 引用到各实例的 .env</span></div>
+    <div class="grid">${S.providers.map(p=>`
+      <div class="card">
+        <div class="hd"><h3>${esc(p.name)}</h3>${p.id===S.defaultModel.provider?'<span class="tag">默认</span>':''}</div>
+        <div class="kv"><span>接口</span><span class="mono">${p.api}</span><span>Base URL</span><span class="mono">${p.baseURL}</span><span>凭证</span><span><code>${p.keyEnv}</code> ${p.keySet?'<span class="dot ok"></span> 已设置':'<span class="dot bad"></span> <span style="color:var(--bad)">未设置</span>'}</span><span>模型</span><span>${p.models.map(m=>`<code>${m}</code>`).join('<br>')}</span></div>
+        <div class="ft"><button class="btn sm" data-act="prov-test" data-p="${p.id}">测试连通</button><button class="btn sm" data-act="prov-edit" data-p="${p.id}">编辑</button>${p.keySet?'':`<button class="btn sm primary" data-act="prov-key" data-p="${p.id}">补充 Key</button>`}</div>
+      </div>`).join('')}</div></div>
+    <div class="sec"><div class="sh"><h3>默认模型</h3><span class="muted small">新建实例默认继承；不覆盖的实例跟随此处变化</span></div>
+    <div class="panel"><div class="form">
+      <label>提供方</label><select id="dm-p">${S.providers.map(p=>`<option value="${p.id}" ${p.id===S.defaultModel.provider?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+      <label>模型</label><select id="dm-m">${dp.models.map(m=>`<option ${m===S.defaultModel.model?'selected':''}>${m}</option>`).join('')}</select>
+      <span></span><div class="inline"><button class="btn primary" data-act="dm-save">保存默认</button><span class="muted small">当前：<code>${S.defaultModel.provider} / ${S.defaultModel.model}</code></span></div>
+    </div></div></div>
+    <div class="sec"><div class="sh"><h3>各实例生效模型</h3></div>
+    <div class="tablewrap"><table><thead><tr><th>实例</th><th>来源</th><th>提供方 / 模型</th><th>凭证</th><th></th></tr></thead><tbody>
+      ${S.instances.map(i=>{const m=i.model||S.defaultModel; const p=S.providers.find(x=>x.id===m.provider); const ok=i.env[p.keyEnv]; return `<tr>
+        <td><b>${esc(i.name)}</b></td><td>${i.model?'<span class="tag warn">实例覆盖</span>':'<span class="tag">跟随默认</span>'}</td>
+        <td class="mono">${m.provider} / ${m.model}</td>
+        <td>${ok?'<span class="dot ok"></span> '+p.keyEnv:`<span class="dot bad"></span> <span style="color:var(--bad)">${p.keyEnv} 缺失</span>`}</td>
+        <td style="text-align:right"><button class="btn sm" data-act="detail-tab" data-id="${i.id}" data-tab="model">${i.model?'修改覆盖':'设置覆盖'}</button></td></tr>`}).join('')}
+    </tbody></table></div></div>`;
+}
+
+function rRuntimes(){
+  topbar('运行时', '每个 DSH 版本一份 node_modules，所有实例共享；升级只是把实例指向另一个版本', `<button class="btn primary" data-act="rt-add">＋ 安装新版本</button>`);
+  $('#view-runtimes').innerHTML = `
+    <div class="note" style="margin-bottom:14px">DSH 仍是 rc 版，官方明说会破坏兼容。升级走金丝雀流程：先让 canary 实例指向新版本 → 跑 <code>--dump-config</code> 与旧版对比 → 人工确认 → 再切生产实例。</div>
+    <div class="grid">${S.runtimes.map(r=>{const users=S.instances.filter(i=>i.rt===r.ver); return `
+      <div class="card">
+        <div class="hd"><h3 class="mono">@deepseek-ai/dsh ${r.ver}</h3>${r.ver===S.settings.defaultRuntime?'<span class="tag">默认</span>':'<span class="tag warn">金丝雀</span>'}</div>
+        <div class="kv"><span>位置</span><span class="mono">${esc(S.settings.rtRoot)}\\${r.ver}</span><span>安装于</span><span>${r.installed}</span><span>体积</span><span>${r.size}</span><span>使用实例</span><span>${users.length?users.map(u=>`<code>${u.name}</code>`).join(' '):'<span class="muted">无</span>'}</span></div>
+        <p class="muted small" style="margin:0">${esc(r.note)}</p>
+        <div class="ft">${r.ver===S.settings.defaultRuntime?'':`<button class="btn sm primary" data-act="canary" data-ver="${r.ver}">金丝雀升级…</button><button class="btn sm" data-act="rt-default" data-ver="${r.ver}">设为默认</button>`}<button class="btn sm ghost danger" ${users.length?'disabled title="仍有实例在用"':''} data-act="rt-del" data-ver="${r.ver}">卸载</button></div>
+      </div>`}).join('')}</div>`;
+}
+
+function rSettings(){
+  topbar('设置', '默认位置、端口池、镜像源、回收站', '');
+  const s=S.settings;
+  $('#view-settings').innerHTML = `
+    <div class="sec"><div class="sh"><h3>默认位置</h3><span class="muted small">新建实例时预填，每个实例都可以单独改</span></div>
+    <div class="panel"><div class="form">
+      <label>实例根目录</label><div class="inline"><input value="${esc(s.instRoot)}" id="s-inst"><button class="btn">浏览…</button></div>
+      <div class="hint">实例的 home 放在 <code>&lt;根目录&gt;\\&lt;实例名&gt;\\home</code>；日志在 <code>&lt;根目录&gt;\\&lt;实例名&gt;\\logs</code></div>
+      <label>工作空间根目录</label><div class="inline"><input value="${esc(s.wsRoot)}" id="s-ws"><button class="btn">浏览…</button></div>
+      <div class="hint">实例启动时的工作目录默认 <code>&lt;根目录&gt;\\&lt;实例名&gt;</code>；可指向任意已有项目目录</div>
+      <label>运行时目录</label><div class="inline"><input value="${esc(s.rtRoot)}" id="s-rt"><button class="btn">浏览…</button></div>
+      <label>默认运行时</label><select>${S.runtimes.map(r=>`<option ${r.ver===s.defaultRuntime?'selected':''}>${r.ver}</option>`).join('')}</select>
+    </div></div></div>
+    <div class="sec"><div class="sh"><h3>端口池</h3></div>
+    <div class="panel"><div class="form">
+      <label>范围</label><div class="inline"><input class="mono" value="${s.pool[0]}" style="max-width:120px" id="s-p0"><span>–</span><input class="mono" value="${s.pool[1]}" style="max-width:120px" id="s-p1"><span class="muted small">当前已分配 ${S.instances.length} 个</span></div>
+      <div class="hint">建议保持 5 位数、避开 3000/8080 这类常用端口。DSH 只绑定 127.0.0.1，不会暴露到局域网。</div>
+    </div></div></div>
+    <div class="sec"><div class="sh"><h3>插件安装</h3></div>
+    <div class="panel"><div class="form">
+      <label>npm 镜像源</label><input value="${esc(s.registry)}" id="s-reg">
+      <div class="hint">npmmirror 对部分 dsh 包同步滞后，默认官方源。可按实例单独覆盖。</div>
+      <label>pnpm</label><div class="inline"><code>C:\\Users\\you\\AppData\\Roaming\\npm\\pnpm.cmd</code><span class="dot ok"></span><span class="muted small">10.30.3</span></div>
+      <label>版本策略</label><div><label class="inline"><input type="checkbox" checked style="width:auto"> 安装插件必须写明版本号（禁止 latest）</label></div>
+    </div></div></div>
+    <div class="sec"><div class="sh"><h3>运行</h3></div>
+    <div class="panel"><div class="form">
+      <label>开机自启</label><div><label class="inline"><input type="checkbox" ${s.autostart?'checked':''} style="width:auto"> 登录 Windows 时启动 DSH Manager 到托盘</label></div>
+      <label>自动拉起</label><div><label class="inline"><input type="checkbox" style="width:auto"> 标记为「自动拉起」的实例，探活连续失败 3 次后自动重启</label></div>
+      <label>关闭窗口时</label><select><option>最小化到托盘，实例继续运行</option><option>退出管理器，实例继续运行</option><option>退出并停止全部实例</option></select>
+    </div></div></div>
+    <div class="sec" id="trash"><div class="sh"><h3>回收站</h3><span class="muted small">删除实例只是把 home 移到这里，${s.trashDays} 天后清理</span></div>
+    <div class="panel">${S.trash.length?S.trash.map(t=>`<div class="envrow"><b>${esc(t.name)}</b><code>${esc(t.path)}</code><span class="muted small">${t.when}</span><button class="btn sm" data-act="restore" data-id="${t.id}">恢复</button><button class="btn sm danger" data-act="purge" data-id="${t.id}">彻底删除</button></div>`).join(''):'<span class="muted">空</span>'}</div></div>
+    <div style="display:flex;gap:8px"><button class="btn primary" data-act="save-settings">保存设置</button></div>`;
+}
+
+/* ============ 抽屉（实例详情） ============ */
+function renderDrawer(){
+  const d=$('#drawer'); const i=S.sel&&inst(S.sel); if(!i){ d.hidden=true; return; } d.hidden=false;
+  const tabs=[['overview','概览'],['plugins','插件'],['config','配置'],['model','模型'],['env','凭证'],['logs','日志']];
+  let body='';
+  if(S.tab==='overview') body=`
+    ${i.lastError?`<div class="note bad" style="margin-bottom:14px"><b>启动失败</b><br>${esc(i.lastError)}</div>`:''}
+    <div class="kvlist">
+      <span>状态</span><span><span class="pill ${i.status}"><i></i>${stName[i.status]}</span> ${i.started?`<span class="muted small">自 ${i.started}</span>`:''}</span>
+      <span>地址</span><span class="mono">http://127.0.0.1:${i.port} ${i.pid?`<span class="muted">· PID ${i.pid}</span>`:''}</span>
+      <span>Profile</span><span class="mono">${i.profile}</span>
+      <span>运行时</span><span class="mono">${i.rt} <span class="muted">（受管，共享）</span></span>
+      <span>Home</span><span class="mono">${esc(i.home)}</span>
+      <span>工作目录</span><span class="mono">${esc(i.cwd)}</span>
+      <span>来源模板</span><span>${S.templates.find(t=>t.id===i.tpl)?.name||'—'}</span>
+      <span>会话记录</span><span>${i.sessions} 个 <button class="btn sm ghost" data-act="soon">浏览会话</button></span>
+      <span>标签</span><span>${i.tags.map(t=>`<span class="tag">${t}</span>`).join(' ')}</span>
+    </div>
+    <div class="sec" style="margin-top:20px"><div class="sh"><h3>位置</h3></div>
+      <div class="form"><label>工作目录</label><div class="inline"><input value="${esc(i.cwd)}"><button class="btn">浏览…</button></div>
+      <label>Home</label><div class="inline"><input value="${esc(i.home)}" disabled><button class="btn" data-act="soon">迁移…</button></div>
+      <div class="hint">迁移 home 会先停止实例，复制后跑 --dump-config 核对再切换。</div></div></div>`;
+  if(S.tab==='plugins') body=`
+    <div class="inline" style="margin-bottom:12px"><input placeholder="包名@版本，例如 @deepseek-ai/dsh-tool-web@0.1.1-rc.2 或 ./my-plugin.mjs" id="plug-in"><button class="btn primary" data-act="plug-add" data-id="${i.id}">安装</button></div>
+    <p class="muted small" style="margin:0 0 8px">安装 = <code>dsh plugin --profile ${i.profile} add &lt;pkg&gt;</code>，然后在 patch 里插入一行使其可见。开关只改 patch，不卸载包。改动需要重启实例生效。</p>
+    ${i.plugins.length?i.plugins.map((p,k)=>`<div class="plug"><div class="n"><b>${esc(p.name)}</b><div>${p.kind==='local'?'本地文件，随 profile 走':'npm · '+p.ver}${p.on?'':' · 已安装未启用'}</div></div><button class="switch ${p.on?'on':''}" data-act="plug-toggle" data-id="${i.id}" data-k="${k}" aria-label="启用"></button><button class="btn sm ghost danger" data-act="plug-rm" data-id="${i.id}" data-k="${k}">卸载</button></div>`).join(''):'<p class="muted">还没有安装插件。bundle 自带的零件（dsh-base、web-app）不在这里列出。</p>'}
+    <div class="sec" style="margin-top:18px"><div class="sh"><h3>bundle 层</h3></div><div class="kvlist"><span>顺序</span><span class="mono">${(S.templates.find(t=>t.id===i.tpl)?.bundles||['dsh-base','dsh-web-app']).join(' → ')}</span></div></div>`;
+  if(S.tab==='config') body=`
+    <div class="inline" style="margin-bottom:10px"><span class="muted small">profile/${i.profile}/cordis.patch.yml</span><span style="flex:1"></span><button class="btn sm" data-act="dump" data-id="${i.id}">校验（dump-config）</button><button class="btn sm" data-act="soon">与模板基线 diff</button></div>
+    <textarea class="code" id="patch-${i.id}">${esc(patchText(i))}</textarea>
+    <div class="note" style="margin-top:10px">覆盖一行必须重写整行的完整 config；新增零件用 <code>- insert:</code>。写错不会报错、只会被静默忽略，所以保存后一定跑一次校验。</div>
+    <div id="dump-out"></div>`;
+  if(S.tab==='model'){ const m=i.model||S.defaultModel; body=`
+    <div class="kvlist" style="margin-bottom:16px"><span>当前生效</span><span class="mono">${m.provider} / ${m.model}</span><span>来源</span><span>${i.model?'实例覆盖':'跟随默认（「模型」页）'}</span></div>
+    <div class="form">
+      <label>覆盖为</label><select id="ov-p">${S.providers.map(p=>`<option value="${p.id}" ${p.id===m.provider?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+      <label>模型</label><select id="ov-m">${S.providers.find(p=>p.id===m.provider).models.map(x=>`<option ${x===m.model?'selected':''}>${x}</option>`).join('')}</select>
+      <span></span><div class="inline"><button class="btn primary" data-act="ov-save" data-id="${i.id}">应用到此实例</button>${i.model?`<button class="btn" data-act="ov-clear" data-id="${i.id}">恢复跟随默认</button>`:''}</div>
+    </div>
+    <div class="note ok" style="margin-top:14px">应用后写入 patch 两行：<code>llm-pi-ai.providers.&lt;id&gt;</code> 与 <code>agent-default-model</code>，并检查该提供方的凭证是否在此实例可用。</div>`; }
+  if(S.tab==='env') body=`
+    <p class="muted small" style="margin:0 0 10px">这里只显示名字与是否已设置。值存在实例的 <code>.env</code>，管理器不上传、不写入模板。</p>
+    ${Object.entries(i.env).map(([k,v])=>`<div class="envrow"><span class="dot ${v?'ok':'bad'}"></span><code>${k}</code><span class="muted small">${v?'已设置':'未设置'}</span>${v?`<button class="btn sm ghost" data-act="env-clear" data-id="${i.id}" data-k="${k}">清除</button>`:`<button class="btn sm primary" data-act="env-set" data-id="${i.id}" data-k="${k}">填入</button>`}</div>`).join('')}
+    <div class="inline" style="margin-top:12px"><input placeholder="新增变量名，如 OPENROUTER_API_KEY" id="env-new"><button class="btn" data-act="env-add" data-id="${i.id}">添加</button></div>`;
+  if(S.tab==='logs') body=`<div class="inline" style="margin-bottom:8px"><span class="muted small">logs\\${i.name}.out.log · 实时尾随</span><span style="flex:1"></span><button class="btn sm" data-act="soon">打开日志文件</button></div><div class="log">${i.logs.join('\n')||'（空）'}</div>`;
+  d.innerHTML=`
+    <div class="dh"><div class="t"><h2>${esc(i.name)}</h2><span class="pill ${i.status}"><i></i>${stName[i.status]}</span><button class="btn ghost sm" data-act="close">✕</button></div>
+      <div class="meta">${esc(i.display)} · <span class="mono">127.0.0.1:${i.port}</span> · <span class="mono">${i.rt}</span></div>
+      <div class="tabs">${tabs.map(([k,n])=>`<button class="${S.tab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div></div>
+    <div class="db">${body}</div>
+    <div class="df">
+      ${i.status==='running'?`<button class="btn primary" data-act="open" data-id="${i.id}">在浏览器打开</button><button class="btn" data-act="restart" data-id="${i.id}">重启</button><button class="btn" data-act="stop" data-id="${i.id}">停止</button>`:`<button class="btn primary" data-act="start" data-id="${i.id}" ${i.status==='starting'||i.status==='stopping'?'disabled':''}>启动</button>`}
+      <span style="flex:1"></span>
+      <button class="btn ghost" data-act="capture" data-id="${i.id}">捕获为模板</button>
+      <button class="btn ghost danger" data-act="del" data-id="${i.id}">删除</button>
+    </div>`;
+  const dl=d.querySelector('.log'); if(dl) dl.scrollTop=dl.scrollHeight;
+}
+
+/* ============ 弹窗 ============ */
+function modal(html, narrow){ $('#modal').className='modal'+(narrow?' narrow':''); $('#modal').innerHTML=html; $('#scrim').hidden=false; }
+function closeModal(){ $('#scrim').hidden=true; }
+
+const W = {step:1, name:'', tpl:'blank-web', rt:'0.1.1-rc.2', home:'', cwd:'', port:null, model:null, prog:null};
+function wizard(tplId){ Object.assign(W,{step:1,name:'',tpl:tplId||'blank-web',rt:S.settings.defaultRuntime,port:nextPort(),model:null,prog:null,customLoc:false}); renderWizard(); }
+function renderWizard(){
+  const t=S.templates.find(x=>x.id===W.tpl); const name=W.name||'new-instance';
+  if(!W.customLoc){ W.home=`${S.settings.instRoot}\\${name}\\home`; W.cwd=`${S.settings.wsRoot}\\${name}`; }
+  const steps=['模板','位置与端口','模型与凭证','确认'].map((s,k)=>`<div class="${W.step===k+1?'cur':W.step>k+1?'done':''}"><b>${k+1}</b>${s}</div>`).join('');
+  let body='', foot='';
+  if(W.step===1) body=`
+    <div class="form" style="margin-bottom:16px"><label>实例名</label><input id="w-name" value="${esc(W.name)}" placeholder="小写字母、数字、连字符，例如 novel-ops"><div class="hint">用于目录名、日志名、进程识别，创建后不可改；显示名随时可改。</div></div>
+    <div class="lbl" style="margin-bottom:8px">从模板创建</div>
+    <div class="choice">${S.templates.map(x=>`<label class="${W.tpl===x.id?'sel':''}"><input type="radio" name="tpl" value="${x.id}" ${W.tpl===x.id?'checked':''}><div><b>${esc(x.name)}</b><span>${esc(x.desc)}</span><div style="margin-top:4px"><code>${x.rt}</code> ${x.plugins.length?`· ${x.plugins.length} 个插件`:''}</div></div></label>`).join('')}</div>`,
+    foot=`<button class="btn" data-act="wz-cancel">取消</button><span class="spacer"></span><button class="btn primary" data-act="wz-next">下一步</button>`;
+  if(W.step===2) body=`
+    <div class="form">
+      <label>运行时</label><select id="w-rt">${S.runtimes.map(r=>`<option ${r.ver===W.rt?'selected':''} ${r.ver!==t.rt?'':''}>${r.ver}${r.ver===t.rt?'（模板基线）':'（与模板不同，创建后会 diff 提示）'}</option>`).join('')}</select>
+      <label>Home 目录</label><div class="inline"><input id="w-home" value="${esc(W.home)}"><button class="btn">浏览…</button></div>
+      <div class="hint">实例的配置、会话、凭证都在这里。默认在「设置 → 实例根目录」下。</div>
+      <label>工作目录</label><div class="inline"><input id="w-cwd" value="${esc(W.cwd)}"><button class="btn">浏览…</button></div>
+      <div class="hint">Agent 启动时看到的目录。可以指向已有项目，例如 <code>D:\\projects\\my-app</code>。</div>
+      <label>端口</label><div class="inline"><input id="w-port" class="mono" value="${W.port}" style="max-width:120px"><span class="muted small">从端口池自动分配的下一个空闲端口；手填会先探测占用</span></div>
+    </div>`,
+    foot=`<button class="btn" data-act="wz-back">上一步</button><span class="spacer"></span><button class="btn primary" data-act="wz-next">下一步</button>`;
+  if(W.step===3){ const m=W.model||S.defaultModel; const p=S.providers.find(x=>x.id===m.provider); body=`
+    <div class="form" style="margin-bottom:16px">
+      <label>模型</label><select id="w-model">${S.providers.flatMap(pp=>pp.models.map(mm=>`<option value="${pp.id}|${mm}" ${pp.id===m.provider&&mm===m.model?'selected':''}>${esc(pp.name)} / ${mm}${pp.id===S.defaultModel.provider&&mm===S.defaultModel.model?'（默认）':''}</option>`)).join('')}</select>
+      <div class="hint">选默认模型则跟随「模型」页设置；选其他则作为实例覆盖写入 patch。</div>
+    </div>
+    <div class="lbl" style="margin-bottom:8px">此模板需要的凭证</div>
+    ${[...new Set([...t.env, p.keyEnv])].map(k=>{const prov=S.providers.find(x=>x.keyEnv===k); const has=prov?prov.keySet:k==='ANTHROPIC_BASE_URL'; return `<div class="envrow"><span class="dot ${has?'ok':'bad'}"></span><code>${k}</code><span class="muted small">${has?'将从 密钥库 引用到实例 .env':'未登记，实例可先创建但启动会失败'}</span>${has?'':'<button class="btn sm primary" data-act="soon">现在填入</button>'}</div>`}).join('')}`,
+    foot=`<button class="btn" data-act="wz-back">上一步</button><span class="spacer"></span><button class="btn primary" data-act="wz-next">下一步</button>`; }
+  if(W.step===4){ const m=W.model||S.defaultModel; body= W.prog ? `<div class="progress">${W.prog.map(p=>`<div class="${p.st}"><span class="st"></span><span>${p.t}</span><span style="flex:1"></span><span class="muted small mono">${p.d||''}</span></div>`).join('')}</div>` : `
+    <div class="kvlist">
+      <span>实例名</span><span><b>${esc(name)}</b></span>
+      <span>模板</span><span>${esc(t.name)} <span class="muted">· ${t.bundles.join(' → ')}</span></span>
+      <span>运行时</span><span class="mono">${W.rt}</span>
+      <span>Home</span><span class="mono">${esc(W.home)}</span>
+      <span>工作目录</span><span class="mono">${esc(W.cwd)}</span>
+      <span>端口</span><span class="mono">127.0.0.1:${W.port}</span>
+      <span>模型</span><span class="mono">${m.provider} / ${m.model}</span>
+      <span>插件</span><span>${t.plugins.length?t.plugins.map(x=>`<code>${esc(x)}</code>`).join('<br>'):'—'}</span>
+    </div>
+    <div class="note" style="margin-top:14px">创建会执行：复制模板 → <code>pnpm install --frozen-lockfile</code> → <code>--dump-config</code> 与模板基线比对 → 检查凭证 → 登记。约 20–60 秒，取决于插件数量。</div>`;
+    foot= W.prog ? (W.prog.every(p=>p.st==='done')?`<span class="spacer"></span><button class="btn" data-act="wz-cancel">关闭</button><button class="btn primary" data-act="wz-start">立即启动</button>`:`<span class="muted small">创建中…</span>`) : `<button class="btn" data-act="wz-back">上一步</button><span class="spacer"></span><button class="btn primary" data-act="wz-create">创建实例</button>`; }
+  modal(`<div class="mh"><h2>新建实例</h2><button class="btn ghost sm" data-act="wz-cancel">✕</button></div><div class="mb"><div class="steps">${steps}</div>${body}</div><div class="mf">${foot}</div>`);
+}
+function wzCollect(){
+  if(W.step===1){ W.name=($('#w-name')?.value||'').trim(); const r=document.querySelector('input[name=tpl]:checked'); if(r) W.tpl=r.value; if(!/^[a-z0-9-]+$/.test(W.name)){ toast('实例名只能用小写字母、数字、连字符','bad'); return false; } if(inst(W.name)){ toast('已有同名实例','bad'); return false;} W.rt=S.templates.find(t=>t.id===W.tpl).rt; }
+  if(W.step===2){ W.rt=$('#w-rt').value.split('（')[0]; const h=$('#w-home').value.trim(), c=$('#w-cwd').value.trim(); if(h!==W.home||c!==W.cwd){W.customLoc=true; W.home=h; W.cwd=c;} const p=parseInt($('#w-port').value,10); if(S.instances.some(i=>i.port===p)||S.external.some(e=>e.port===p)){ toast(`端口 ${p} 已被占用`,'bad'); return false;} W.port=p; }
+  if(W.step===3){ const [pv,mm]=$('#w-model').value.split('|'); W.model=(pv===S.defaultModel.provider&&mm===S.defaultModel.model)?null:{provider:pv,model:mm}; }
+  return true;
+}
+function wzCreate(){
+  const t=S.templates.find(x=>x.id===W.tpl);
+  W.prog=[{t:'创建目录并复制模板 profile / home 设定',st:'doing'},{t:`pnpm install --frozen-lockfile（${t.plugins.length} 个插件）`,st:''},{t:'dsh --dump-config 与模板基线比对',st:''},{t:'检查凭证并写入 .env 引用',st:''},{t:'登记到实例表，分配端口',st:''}];
+  renderWizard();
+  const tick=(k,d)=>{ W.prog[k].st='done'; W.prog[k].d=d; if(W.prog[k+1]) W.prog[k+1].st='doing'; renderWizard(); };
+  setTimeout(()=>tick(0,'0.4s'),500); setTimeout(()=>tick(1,t.plugins.length?'14.2s':'2.1s'),1600); setTimeout(()=>tick(2,'一致 · 214 行'),2500); setTimeout(()=>tick(3,''),3000);
+  setTimeout(()=>{ tick(4,'');
+    const m=W.model||S.defaultModel; const p=S.providers.find(x=>x.id===m.provider);
+    const env={}; [...new Set([...t.env,p.keyEnv])].forEach(k=>{const pr=S.providers.find(x=>x.keyEnv===k); env[k]=pr?pr.keySet:true;});
+    S.instances.push({id:W.name,name:W.name,display:W.name,status:'stopped',port:W.port,pid:null,profile:t.profile,rt:W.rt,home:W.home,cwd:W.cwd,tags:['新建'],tpl:t.id,model:W.model,plugins:t.plugins.map(x=>({name:x.replace(/@[^@]+$/,''),ver:x.includes('@0')?x.split('@').pop():'本地',on:true,kind:x.startsWith('./')?'local':'npm'})),env,started:null,sessions:0,logs:[`<span class="t">${now()}</span> created from template "${t.name}" by DSH Manager`]});
+    render(); toast(`实例 ${W.name} 已创建`,'ok');
+  },3500);
+}
+
+function importWizard(step=1){
+  const sel=S.discovered.filter(d=>d.sel);
+  if(step===1) modal(`<div class="mh"><h2>导入现有实例</h2><button class="btn ghost sm" data-act="close-modal">✕</button></div><div class="mb">
+    <p class="muted small" style="margin:0 0 12px">已扫描 E:\\、~\\.dsh 和常见位置，找到 ${S.discovered.length} 个尚未纳管的 DSH 安装。导入后统一用受管运行时，端口从端口池重新分配。</p>
+    ${S.discovered.map(d=>`<label class="check"><input type="checkbox" data-disc="${d.id}" ${d.sel?'checked':''}><div class="n"><b>${esc(d.name)}</b><div>${esc(d.path)}</div></div><div style="text-align:right" class="small"><div class="mono">${d.rt}</div><div class="muted">${d.profiles.length} 个 profile · ${d.size}${d.port?` · 原端口 ${d.port}`:''}</div></div></label>`).join('')}
+    <div class="lbl" style="margin:16px 0 8px">Home 处理方式</div>
+    <div class="choice"><label class="sel"><input type="radio" name="mv" checked><div><b>迁移到实例根目录（推荐）</b><span>复制 home 到 ${esc(S.settings.instRoot)}\\&lt;名&gt;\\home，原目录保留为备份；patch 里的相对路径会自动检查。</span></div></label><label><input type="radio" name="mv"><div><b>原地纳管</b><span>home 留在原处，只登记路径。适合还在被别的脚本引用的目录。</span></div></label></div>
+    <div class="note" style="margin-top:14px">原自带的 node_modules（每份约 260 MB）不再需要，导入完成后可一键清理。</div>
+  </div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn primary" data-act="imp-go" ${sel.length?'':'disabled'}>导入 ${sel.length} 个</button></div>`);
+  if(step===2){ const rows=sel.map(d=>({d,port:null})); let p=S.settings.pool[0]; const used=new Set([...S.instances.map(i=>i.port),...S.external.map(e=>e.port)]); rows.forEach(r=>{ while(used.has(p)) p++; r.port=p; used.add(p); });
+    modal(`<div class="mh"><h2>导入现有实例</h2></div><div class="mb"><div class="progress">${rows.map(r=>`<div class="done"><span class="st"></span><span><b>${esc(r.d.name)}</b> → <code>${esc(r.d.id)}</code>，端口 <span class="mono">${r.d.port?r.d.port+' → ':''}${r.port}</span>，运行时切到受管 <code>${r.d.rt}</code></span></div>`).join('')}<div class="done"><span class="st"></span><span>dump-config 与原安装比对：全部一致</span></div></div>
+    ${sel.some(d=>d.id==='lab')?'<div class="note" style="margin-top:12px"><b>lab</b> 有 4 个 profile。管理器按「一个 profile = 一个可启动实例」登记，已把 web 登记为实例，其余 3 个 profile 可在详情页切换。</div>':''}
+    </div><div class="mf"><span class="spacer"></span><button class="btn primary" data-act="imp-done">完成</button></div>`);
+    rows.forEach(r=>{ S.instances.push({id:r.d.id,name:r.d.id,display:r.d.name+'（导入）',status:'stopped',port:r.port,pid:null,profile:'web',rt:r.d.rt,home:`${S.settings.instRoot}\\${r.d.id}\\home`,cwd:r.d.path,tags:['导入'],tpl:'blank-web',model:null,plugins:[],env:{DEEPSEEK_API_KEY:true},started:null,sessions:r.d.id==='lab'?21:3,logs:[`<span class="t">${now()}</span> imported from ${r.d.path}; original left in place as backup`]}); });
+    S.discovered=S.discovered.filter(d=>!d.sel); }
+}
+
+function confirmDelete(id){ const i=inst(id); modal(`<div class="mh"><h2>删除实例 ${esc(i.name)}</h2></div><div class="mb">
+  <p style="margin:0 0 10px">这会${i.status==='running'?'<b>先停止实例</b>，然后':''}把 home 移到回收站，${S.settings.trashDays} 天内可恢复。</p>
+  <div class="kvlist"><span>Home</span><span class="mono">${esc(i.home)}</span><span>会话记录</span><span>${i.sessions} 个（约 ${(i.sessions*7.6).toFixed(0)} MB）</span><span>端口</span><span class="mono">${i.port} 将释放回端口池</span></div>
+  <label class="inline" style="margin-top:14px"><input type="checkbox" id="hard" style="width:auto"> 直接彻底删除，不进回收站（不可恢复）</label>
+  </div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn danger" data-act="del-go" data-id="${id}">删除</button></div>`, true); }
+
+/* ============ 事件 ============ */
+document.addEventListener('click', e=>{
+  const nav=e.target.closest('#rail button[data-view]'); if(nav){ S.view=nav.dataset.view; render(); return; }
+  const tab=e.target.closest('.drawer .tabs button'); if(tab){ S.tab=tab.dataset.tab; renderDrawer(); return; }
+  const a=e.target.closest('[data-act]');
+  if(a){ e.preventDefault(); const act=a.dataset.act, id=a.dataset.id;
+    switch(act){
+      case 'start': start(id); break; case 'stop': stop(id); break; case 'restart': restart(id); break; case 'open': openUrl(id); break;
+      case 'detail': S.sel=id; S.tab='overview'; render(); break;
+      case 'detail-tab': S.sel=id; S.tab=a.dataset.tab; S.view='instances'; render(); break;
+      case 'close': S.sel=null; renderDrawer(); render(); break;
+      case 'new': wizard(a.dataset.tpl); break;
+      case 'import': importWizard(1); break;
+      case 'imp-go': importWizard(2); break; case 'imp-done': closeModal(); render(); toast('导入完成，端口已重新分配','ok'); break;
+      case 'wz-cancel': closeModal(); break; case 'wz-back': W.step--; renderWizard(); break;
+      case 'wz-next': if(wzCollect()){ W.step++; renderWizard(); } break;
+      case 'wz-create': wzCreate(); break; case 'wz-start': closeModal(); start(W.name); break;
+      case 'close-modal': closeModal(); break;
+      case 'del': confirmDelete(id); break;
+      case 'del-go': { const i=inst(id); const hard=$('#hard').checked; const fin=()=>{ S.instances=S.instances.filter(x=>x.id!==id); if(!hard) S.trash.push({id,name:i.name,path:i.home.replace(/\\home$/,'')+'\\.trash\\'+i.name+'-'+Date.now(),when:'刚刚'}); if(S.sel===id) S.sel=null; closeModal(); render(); toast(hard?`${i.name} 已彻底删除`:`${i.name} 已移到回收站`,hard?'bad':''); }; i.status==='running'?stop(id,fin):fin(); break; }
+      case 'restore': { const t=S.trash.find(x=>x.id===id); S.trash=S.trash.filter(x=>x.id!==id); S.instances.push({id:t.id,name:t.name,display:t.name+'（已恢复）',status:'stopped',port:nextPort(),pid:null,profile:'web',rt:S.settings.defaultRuntime,home:t.path.replace(/\\\.trash.*/,'')+'\\home',cwd:S.settings.wsRoot+'\\'+t.name,tags:['恢复'],tpl:'blank-web',model:null,plugins:[],env:{DEEPSEEK_API_KEY:true},started:null,sessions:0,logs:[]}); render(); toast(`${t.name} 已恢复，端口重新分配`,'ok'); break; }
+      case 'purge': S.trash=S.trash.filter(x=>x.id!==id); render(); toast('已彻底删除','bad'); break;
+      case 'settings-trash': S.view='settings'; render(); document.getElementById('trash')?.scrollIntoView(); break;
+      case 'plug-toggle': { const i=inst(id); i.plugins[a.dataset.k].on=!i.plugins[a.dataset.k].on; renderDrawer(); toast(`已${i.plugins[a.dataset.k].on?'启用':'停用'}，重启 ${i.name} 后生效`); break; }
+      case 'plug-rm': { const i=inst(id); const p=i.plugins.splice(a.dataset.k,1)[0]; renderDrawer(); toast(`已卸载 ${p.name}（pnpm remove + 删除 patch 行）`); break; }
+      case 'plug-add': { const v=$('#plug-in').value.trim(); if(!v){toast('先填包名','bad');break;} if(!v.startsWith('./')&&!/@[\d]/.test(v)){ toast('必须写明版本号，例如 @0.1.1-rc.2（禁止 latest）','bad'); break; } const i=inst(id); toast(`pnpm add ${v} …`); setTimeout(()=>{ i.plugins.push({name:v.replace(/@[\d][^@]*$/,''),ver:v.startsWith('./')?'本地':v.split('@').pop(),on:true,kind:v.startsWith('./')?'local':'npm'}); renderDrawer(); toast('安装完成并已写入 patch，重启后生效','ok'); },1200); break; }
+      case 'dump': { const i=inst(id); const out=$('#dump-out'); out.innerHTML='<div class="note" style="margin-top:10px">正在跑 dsh --profile '+i.profile+' --dump-config …</div>'; setTimeout(()=>{ const bad=$('#patch-'+id).value.includes('- id: agent-default-modle'); out.innerHTML=bad?'<div class="note bad" style="margin-top:10px"><b>校验未通过</b>：第 12 行 <code>agent-default-modle</code> 不匹配任何零件，会被静默忽略。你是不是想写 <code>agent-default-model</code>？</div>':'<div class="note ok" style="margin-top:10px"><b>校验通过</b>：合成 214 行，本 patch 命中 '+(3+i.plugins.filter(p=>p.on).length)+' 行，0 行被忽略。与模板基线差异：'+(i.model?'1 行（模型覆盖，预期内）':'无')+'。</div>'; },900); break; }
+      case 'ov-save': { const i=inst(id); const pv=$('#ov-p').value, mm=$('#ov-m').value; i.model={provider:pv,model:mm}; const p=S.providers.find(x=>x.id===pv); if(i.env[p.keyEnv]===undefined) i.env[p.keyEnv]=p.keySet; renderDrawer(); toast(`已写入 ${i.name} 的 patch，重启后生效${i.env[p.keyEnv]?'':' · 注意：缺少 '+p.keyEnv}`, i.env[p.keyEnv]?'ok':'bad'); break; }
+      case 'ov-clear': { inst(id).model=null; renderDrawer(); toast('已恢复跟随默认'); break; }
+      case 'env-set': { const i=inst(id); i.env[a.dataset.k]=true; if(i.status==='error') { i.status='stopped'; i.lastError=null; } render(); toast(`${a.dataset.k} 已从 密钥库 引用写入 .env`,'ok'); break; }
+      case 'env-clear': inst(id).env[a.dataset.k]=false; render(); break;
+      case 'env-add': { const k=$('#env-new').value.trim(); if(k){ inst(id).env[k]=false; renderDrawer(); } break; }
+      case 'dm-save': { S.defaultModel={provider:$('#dm-p').value,model:$('#dm-m').value}; render(); toast('默认模型已保存，跟随默认的实例重启后生效','ok'); break; }
+      case 'prov-test': toast(`正在请求 ${S.providers.find(p=>p.id===a.dataset.p).baseURL}/models …`); setTimeout(()=>toast(S.providers.find(p=>p.id===a.dataset.p).keySet?'连通正常 · 182 ms':'失败：未设置 API Key', S.providers.find(p=>p.id===a.dataset.p).keySet?'ok':'bad'),800); break;
+      case 'prov-key': { const p=S.providers.find(x=>x.id===a.dataset.p); p.keySet=true; render(); toast(`${p.keyEnv} 已登记（值保存在 密钥库）`,'ok'); break; }
+      case 'prov-edit': case 'add-provider': modal(`<div class="mh"><h2>${act==='add-provider'?'添加提供方':'编辑提供方'}</h2></div><div class="mb"><div class="form"><label>名称</label><input value="${act==='add-provider'?'':esc(S.providers.find(x=>x.id===a.dataset.p).name)}" placeholder="例如 Moonshot"><label>接口类型</label><select><option>openai-completions（OpenAI 兼容）</option><option>deepseek</option><option>anthropic-messages</option></select><label>Base URL</label><input placeholder="https://…/v1"><label>凭证变量名</label><input placeholder="MOONSHOT_API_KEY" class="mono"><div class="hint">只登记名字。值到 密钥库 对应文件里取。</div><label>模型列表</label><textarea rows="3" placeholder="每行一个 model id"></textarea></div></div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn primary" data-act="close-modal">保存</button></div>`); break;
+      case 'reassign': { const i=inst(id); const p=nextPort(); if(i.status==='running'){ toast('运行中不能换端口，先停止','bad'); break;} const old=i.port; i.port=p; if(i.lastError&&i.lastError.includes('端口')){i.status='stopped';i.lastError=null;} render(); toast(`${i.name}：${old} → ${p}`,'ok'); break; }
+      case 'ext-kill': { const e=S.external.find(x=>x.port==a.dataset.port); modal(`<div class="mh"><h2>端口 ${e.port} 的占用者</h2></div><div class="mb"><div class="kvlist"><span>PID</span><span class="mono">${e.pid}</span><span>进程</span><span>${esc(e.proc)}</span><span>命令行</span><span class="mono">node D:\\projects\\my-server\\index.js</span><span>判断</span><span>不是任何受管实例，管理器不会去杀它</span></div><div class="note" style="margin-top:12px">端口池分配时会自动跳过这个端口。如果它是你自己的服务，考虑把它挪出 ${S.settings.pool[0]}–${S.settings.pool[1]}。</div></div><div class="mf"><button class="btn" data-act="close-modal">关闭</button><span class="spacer"></span><button class="btn danger" data-act="ext-do" data-port="${e.port}">仍要结束该进程</button></div>`,true); break; }
+      case 'ext-do': S.external=S.external.filter(x=>x.port!=a.dataset.port); closeModal(); render(); toast('已结束进程，端口释放'); break;
+      case 'scan': toast('探测中…'); setTimeout(()=>{render(); toast('探测完成：'+S.external.length+' 个外部占用','ok');},700); break;
+      case 'capture': { const i=inst(id)||S.instances[0]; modal(`<div class="mh"><h2>从实例捕获模板</h2></div><div class="mb"><div class="form"><label>来源实例</label><select>${S.instances.map(x=>`<option ${x.id===i.id?'selected':''}>${x.name}</option>`).join('')}</select><label>模板名</label><input value="${esc(i.display)} 模板"><label>包含</label><div><label class="inline"><input type="checkbox" checked style="width:auto"> profile 配置与插件清单（含锁文件）</label><br><label class="inline"><input type="checkbox" checked style="width:auto"> home 级 patch、岗位 preset、skills</label><br><label class="inline"><input type="checkbox" disabled style="width:auto"> 会话记录（永不包含）</label><br><label class="inline"><input type="checkbox" disabled style="width:auto"> .env / 凭证（永不包含，只记变量名）</label></div></div><div class="note ok" style="margin-top:12px">捕获时会跑一次 --dump-config 存为基线，以后用此模板新建的实例都跟它比对。</div></div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn primary" data-act="cap-go" data-id="${i.id}">捕获</button></div>`); break; }
+      case 'cap-go': { const i=inst(id); S.templates.push({id:'tpl-'+Date.now(),name:i.display+' 模板',builtin:false,rt:i.rt,profile:i.profile,bundles:S.templates.find(t=>t.id===i.tpl)?.bundles||['dsh-base','dsh-web-app'],plugins:i.plugins.map(p=>p.kind==='local'?p.name:p.name+'@'+p.ver),env:Object.keys(i.env),desc:`从 ${i.name} 捕获。`,captured:'刚刚'}); closeModal(); S.view='templates'; render(); toast('模板已捕获，基线 dump 已保存','ok'); break; }
+      case 'tpl-del': S.templates=S.templates.filter(t=>t.id!==a.dataset.tpl); render(); toast('模板已删除（已创建的实例不受影响）'); break;
+      case 'tpl-diff': modal(`<div class="mh"><h2>模板基线 dump</h2></div><div class="mb"><div class="log" style="max-height:420px">${esc(`# dsh --profile web --dump-config  (captured 2026-09-01, 214 rows)
+- id: agent-loop                    # bundle:dsh-base
+  name: '@deepseek-ai/dsh-agent-loop'
+- id: agent-default-model           # profile/cordis.patch.yml:9
+  config: { provider: deepseek, model: deepseek-chat }
+- id: system-prompt                 # profile/cordis.patch.yml:3
+  config: { persona: '你是"公司实例"的助理 …' }
+- id: tool-subagent-claude-code     # profile/cordis.patch.yml:17 (insert)
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config: { provider: claude-code, toolName: subagent_claude_code }
+- id: my-ledger                    # profile/cordis.patch.yml:23 (insert)
+  name: ./my-ledger/index.mjs
+- id: webserver                     # bundle:dsh-web-app
+  config: { host: 127.0.0.1, port: !!js ctx.webStartup.port ?? 3080 }
+… 206 more rows`)}</div></div><div class="mf"><span class="spacer"></span><button class="btn" data-act="close-modal">关闭</button></div>`); break;
+      case 'canary': modal(`<div class="mh"><h2>金丝雀升级到 ${a.dataset.ver}</h2></div><div class="mb"><div class="progress"><div class="done"><span class="st"></span><span>1. 选择金丝雀实例：<b>canary</b>（已停止）</span></div><div class="done"><span class="st"></span><span>2. 用 ${a.dataset.ver} 跑 --dump-config</span><span style="flex:1"></span><span class="mono small muted">217 行</span></div><div class="fail"><span class="st"></span><span>3. 与 rc.2 基线比对：<b style="color:var(--bad)">3 行差异</b></span></div></div><div class="log" style="margin-top:10px">${esc(`+ id: compaction-tool-result-pruner   # 新增零件（bundle:dsh-base）
+~ id: session-persistence-jsonl        # config.compression: gzip → zstd
+- id: tool-ralph                       # 从 base bundle 移除`)}</div><div class="note" style="margin-top:10px">差异属于 DSH 自身变化，不是你的 patch 失效。建议先在 canary 启动实测，确认后再把生产实例逐个切过去。</div></div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn primary" data-act="canary-go" data-ver="${a.dataset.ver}">让 canary 切到 ${a.dataset.ver}</button></div>`); break;
+      case 'canary-go': { const c=inst('canary'); if(c){ c.rt=a.dataset.ver; } closeModal(); render(); toast(`canary 已指向 ${a.dataset.ver}，启动它验证`,'ok'); break; }
+      case 'rt-default': S.settings.defaultRuntime=a.dataset.ver; render(); toast('默认运行时已更新，只影响新建实例'); break;
+      case 'rt-add': modal(`<div class="mh"><h2>安装新版本</h2></div><div class="mb"><div class="form"><label>版本</label><input class="mono" placeholder="0.1.1-rc.4（必须显式版本，不接受 latest）"><label>镜像源</label><input value="${esc(S.settings.registry)}"></div><div class="note" style="margin-top:12px">安装到 ${esc(S.settings.rtRoot)}\\&lt;版本&gt;，约 260 MB。不会影响任何现有实例。</div></div><div class="mf"><button class="btn" data-act="close-modal">取消</button><span class="spacer"></span><button class="btn primary" data-act="close-modal">安装</button></div>`,true); break;
+      case 'rt-del': S.runtimes=S.runtimes.filter(r=>r.ver!==a.dataset.ver); render(); toast('已卸载'); break;
+      case 'save-settings': { S.settings.instRoot=$('#s-inst').value; S.settings.wsRoot=$('#s-ws').value; S.settings.rtRoot=$('#s-rt').value; S.settings.pool=[+$('#s-p0').value,+$('#s-p1').value]; S.settings.registry=$('#s-reg').value; render(); toast('设置已保存','ok'); break; }
+      case 'soon': toast('原型中未实现，正式版会有'); break;
+    }
+    return;
+  }
+  const row=e.target.closest('.row[data-open]'); if(row && !e.target.closest('[data-stop]')){ S.sel=row.dataset.open; S.tab='overview'; render(); return; }
+  const disc=e.target.closest('input[data-disc]'); if(disc){ S.discovered.find(d=>d.id===disc.dataset.disc).sel=disc.checked; $('#modal .mf .primary').disabled=!S.discovered.some(d=>d.sel); $('#modal .mf .primary').textContent=`导入 ${S.discovered.filter(d=>d.sel).length} 个`; }
+  const ch=e.target.closest('.choice label'); if(ch){ ch.parentElement.querySelectorAll('label').forEach(l=>l.classList.remove('sel')); ch.classList.add('sel'); }
+  if(e.target===$('#scrim')) closeModal();
+});
+document.addEventListener('change', e=>{
+  if(e.target.id==='dm-p'){ const p=S.providers.find(x=>x.id===e.target.value); $('#dm-m').innerHTML=p.models.map(m=>`<option>${m}</option>`).join(''); }
+  if(e.target.id==='ov-p'){ const p=S.providers.find(x=>x.id===e.target.value); $('#ov-m').innerHTML=p.models.map(m=>`<option>${m}</option>`).join(''); }
+  if(e.target.id==='w-name'){ W.name=e.target.value.trim(); }
+});
+document.addEventListener('input', e=>{ if(e.target.id==='w-name'){ W.name=e.target.value.trim(); } });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if(!$('#scrim').hidden) closeModal(); else if(S.sel){ S.sel=null; render(); } } });
+render();
+</script>

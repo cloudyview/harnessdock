@@ -1,0 +1,26 @@
+# --- never commit local state ---
+# internal working notes (contain machine-specific paths)
+docs/internal/
+docs/task-ledger/
+# runtime data (registry, instances, runtimes, logs, templates captured from local instances)
+data/
+*.local.json
+.env
+.env.*
+*.credentials.yaml
+tmp/
+
+# --- build output ---
+node_modules/
+dist/
+dist-ssr/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.log
+
+# --- editors / os ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
