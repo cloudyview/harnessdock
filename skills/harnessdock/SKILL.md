@@ -6,7 +6,7 @@ description: 用 hdock 命令行管理本机的 DeepSeek Harness (dsh) 实例：
 # HarnessDock / hdock
 
 HarnessDock 是桌面 App（/Applications/HarnessDock.app），`hdock` 是它的命令行前端。
-两者共用同一份登记表 `~/.harnessdock/registry.json`（本机实际在 /Volumes/DATA/DeepSeekHarnessProject/.harnessdock/）。
+两者共用同一份登记表 `~/.harnessdock/registry.json`（可能是指向别处的符号链接，或由 `HARNESSDOCK_DATA` 改写）。
 CLI 改了登记表 App 会自动重读；CLI 启动的实例 App 通过端口扫描接管。**App 不需要开着。**
 
 一个 dsh 实例 = 一份共享运行时（dsh 版本）+ 一个 DSH_HOME + 一个 profile + 一个端口。
@@ -69,11 +69,12 @@ hdock create <id> [--template blank-web|blank-headless|<已捕获模板>] [--run
                   [--home <DSH_HOME>] [--cwd <工作目录>] [--model deepseek/deepseek-v4-pro] [--display 名称]
 ```
 
-- id 只能小写字母、数字、连字符。本机约定用 `dsh-<业务名>`。
-- 缺省 home = `<instRoot>/<id>/home`，缺省 cwd = `<wsRoot>/<id>`。本机两者都是
-  /Volumes/DATA/DeepSeekHarnessProject，所以新实例落成该目录下的 `dsh-<name>/`。
+- id 只能小写字母、数字、连字符。
+- 缺省 home = `<instRoot>/<id>/home`，缺省 cwd = `<wsRoot>/<id>`。**这两个根目录因机器而异，
+  动手前先跑 `hdock settings` 看这台机器实际配的是什么**，不要假定。若两者指向同一个目录，
+  新实例就落成该目录下的 `<id>/`。
 - create 会初始化 profile、装 bundle 插件、跑一次 dump-config，可能要几十秒。
-- 建完提醒用户把凭证写进 `<home>/.env`，然后才能 `hdock start` 或 `hdock run`。
+- 建完先跑 `hdock info <id>` 看 `missing_env`：为空就能直接启动；确实缺才请用户补凭证。
 
 **搭架子的分工**：hdock 只管到实例边界。实例内部的 `AGENTS.md`、`skills/`、`.agent-presets/`、
 `profiles/<p>/cordis.patch.yml` 都是普通文件，直接用你自己的文件工具写，写完跑 `hdock validate <id>` 验证。
@@ -113,9 +114,13 @@ hdock runtime install <版本>                   # 金丝雀：装新版 → 在
 hdock runtime default <版本>
 ```
 
-## 目录约定（本机）
+## 目录约定
+
+先用 `hdock settings` 读出这台机器的 `instRoot` / `wsRoot` / `rtRoot`，再按下面的分工放东西：
 
 - **对话、任务、状态**：实例 `home/`（sessions、storages、attachments），dsh 自动展开。
 - **实例专属资产**（skills、总账、agent 预设）：实例 `home/` 下手放。
-- **项目代码与产出**：不要放进 home。放在与实例平级的独立目录（如 company-biz/），在 dsh 里作为工作区打开。
-- 共享运行时 `.runtimes/<版本>/`、登记表 `.harnessdock/`：可重建，不入库，不要手改。
+- **项目代码与产出**：不要放进 home。放在与实例平级的独立目录，在 dsh 里作为工作区打开。
+- 运行时目录与登记表：可重建，不入库，不要手改。
+
+如果这台机器另有约定（实例命名、目录布局、端口安排），一般写在 `instRoot` 附近的项目文档里，先看一眼再动手。
