@@ -24,6 +24,21 @@ pub fn runtime_installed(rt_root: &str, version: &str) -> bool {
     bin_js(rt_root, version).exists()
 }
 
+/// `bin.js` existing is not proof the runtime *runs*: a node_modules tree
+/// copied from another install can lose the layout node needs to resolve the
+/// launcher's own dependencies. Boot it once and see.
+pub fn runtime_boots(node: &str, rt_root: &str, version: &str) -> bool {
+    let bin = bin_js(rt_root, version);
+    if !bin.exists() {
+        return false;
+    }
+    let mut c = std::process::Command::new(node);
+    c.arg(&bin).arg("--version");
+    c.env("DSH_TELEMETRY_DISABLED", "1");
+    quiet(&mut c);
+    matches!(run_capture(&mut c), Ok((true, out)) if out.contains(version))
+}
+
 /// Read the installed dsh version from any directory holding a node_modules tree.
 pub fn version_in(dir: &Path) -> Option<String> {
     let pkg = dir.join("node_modules").join("@deepseek-ai").join("dsh").join("package.json");

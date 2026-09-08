@@ -199,6 +199,12 @@ pub fn import(store: &mut Store, req: ImportReq) -> R<Instance> {
                     if !dst.join("package.json").exists() {
                         fs::write(dst.join("package.json"), "{\n  \"name\": \"harnessdock-runtime\",\n  \"private\": true\n}\n").map_err(err)?;
                     }
+                    // An adopted tree must actually boot; if the copy lost the
+                    // layout node needs, drop it and let ensure_runtime install
+                    // a clean one from the registry instead.
+                    if !dsh::runtime_boots(&s.node_path, &s.rt_root, &req.runtime) {
+                        let _ = fs::remove_dir_all(&dst);
+                    }
                     break;
                 }
             }

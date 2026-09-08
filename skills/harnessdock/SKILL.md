@@ -17,8 +17,18 @@ CLI 改了登记表 App 会自动重读；CLI 启动的实例 App 通过端口�
 2. **版本必须写明确版本号**（如 `0.1.1-rc.2`），不接受 latest 或范围。插件 spec 同理。
 3. **不要手改** `.runtimes/`、`registry.json`、实例 `out.log`。改配置走 `hdock`，或编辑实例 home 里的
    `profiles/<profile>/cordis.patch.yml` 后跑 `hdock validate <id>`。
-4. **凭证不经过 hdock，也不经过你**。API key 由用户自己写进实例 `home/.env`（如 `DEEPSEEK_API_KEY=...`）。
-   不要生成、复制、打印或搬运密钥；缺凭证时报告给用户，让他自己补。
+4. **凭证不经过 hdock，也不经过你**。不要生成、复制、打印或搬运密钥；缺凭证时报告给用户，让他自己补。
+   HarnessDock 只存变量名（如 `DEEPSEEK_API_KEY`），从不存 key 的值。dsh 自己按这个顺序找 key，高者胜：
+
+   | 优先级 | 来源 |
+   |---|---|
+   | 1 | 继承来的进程环境变量（只读，最高） |
+   | 2 | `$DSH_HOME/.credentials.yaml` |
+   | 3 | 调用时 cwd 下的 `.env` |
+   | 4 | `$DSH_HOME/.env` |
+
+   因为进程环境变量会被继承，**用户在 shell 里 export 一次，所有实例都能用**，新实例不必单独配 `.env`。
+   所以新建实例后不要一律叫用户去写 `.env`：先跑 `hdock info <id>` 看 `missing_env` 是否真的缺。
 5. `hdock delete <id>` 默认只从登记表移除、**不动磁盘**。`--trash` / `--hard` 会动 home，必须用户明确要求才用。
 
 所有命令支持 `--json`；出错时 `--json` 输出 `{"error": "..."}` 并以非零码退出。

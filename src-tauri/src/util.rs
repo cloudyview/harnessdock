@@ -59,10 +59,34 @@ pub fn run_capture(cmd: &mut Command) -> R<(bool, String)> {
 /// pnpm layout links `profiles/node_modules/*` to the launcher install), with a
 /// depth cap so a link cycle cannot run forever.
 pub fn copy_dir(src: &Path, dst: &Path, skip: &[&str]) -> R<u64> {
-    copy_dir_depth(src, dst, skip, 0)
+    let root = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
+    copy_dir_depth(src, dst, skip, 0, &root)
 }
 
-fn copy_dir_depth(src: &Path, dst: &Path, skip: &[&str], depth: usize) -> R<u64> {
+/// Recreate a symlink verbatim. Returns false when the platform refuses
+/// (Windows needs Developer Mode or elevation), so the caller can fall back
+/// to copying what it points at.
+#[allow(unused_variables)]
+fn relink(target: &Path, at: &Path, is_dir: bool) -> bool {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, at).is_ok()
+    }
+    #[cfg(windows)]
+    {
+        if is_dir {
+            std::os::windows::fs::symlink_dir(target, at).is_ok()
+        } else {
+            std::os::windows::fs::symlink_file(target, at).is_ok()
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        false
+    }
+}
+
+fn copy_dir_depth(src: &Path, dst: &Path, skip: &[&str], depth: usize, root: &Path) -> R<u64> {
     if depth > 48 {
         return Err(format!("目录嵌套过深（可能是链接循环）: {}", src.display()));
     }
@@ -77,10 +101,32 @@ fn copy_dir_depth(src: &Path, dst: &Path, skip: &[&str], depth: usize) -> R<u64>
         }
         let from = entry.path();
         let to = dst.join(&name);
+        // A link that stays inside the tree we are copying is part of the tree's
+        // own shape, not a pointer out of it: pnpm's isolated node_modules links
+        // `@scope/pkg` at `.pnpm/<pkg>@<ver>/node_modules/@scope/pkg`, and node
+        // resolves a package's siblings from the link's *real* path. Following
+        // such a link would flatten the store into one real directory whose
+        // siblings are gone, so the copied tree no longer boots (and weighs many
+        // times more). Links pointing outside the tree are still followed —
+        // dsh's hoisted profile layout relies on that to materialise them.
+        if fs::symlink_metadata(&from).map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+            if let Ok(target) = fs::read_link(&from) {
+                let inside = from
+                    .parent()
+                    .map(|p| p.join(&target))
+                    .and_then(|r| r.canonicalize().ok())
+                    .map(|r| r.starts_with(root))
+                    .unwrap_or(false);
+                if inside && relink(&target, &to, fs::metadata(&from).map(|m| m.is_dir()).unwrap_or(false)) {
+                    n += 1;
+                    continue;
+                }
+            }
+        }
         // metadata() follows links; a dangling link is skipped
         let Ok(md) = fs::metadata(&from) else { continue };
         if md.is_dir() {
-            n += copy_dir_depth(&from, &to, skip, depth + 1)?;
+            n += copy_dir_depth(&from, &to, skip, depth + 1, root)?;
         } else if md.is_file() {
             fs::copy(&from, &to).map_err(|e| format!("复制 {} 失败: {}", from.display(), e))?;
             n += 1;

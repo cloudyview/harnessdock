@@ -1,0 +1,77 @@
+name: release
+
+# 打 v* 标签时构建三个产物并挂到一个 draft release：
+#   macOS Apple Silicon (.dmg) / macOS Intel (.dmg) / Windows (NSIS .exe)
+# 也可以在 Actions 页手动触发（workflow_dispatch）做一次不发布的构建验证。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            label: macOS Apple Silicon
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            label: macOS Intel
+          - platform: windows-latest
+            target: ''
+            label: Windows
+    runs-on: ${{ matrix.platform }}
+    name: ${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: HarnessDock ${{ github.ref_name }}
+          releaseBody: |
+            DeepSeek Harness (dsh) 实例管理器。
+
+            | 下载 | 平台 |
+            |---|---|
+            | `*_aarch64.dmg` | macOS Apple Silicon |
+            | `*_x64.dmg` | macOS Intel |
+            | `*-setup.exe` | Windows 10/11 |
+
+            两个平台的包都未做代码签名：macOS 首次打开需右键「打开」，
+            Windows 会有 SmartScreen 提示，选「仍要运行」。
+
+            命令行 `hdock` 不在安装包内，需从源码构建：
+            `cargo build --release --bin hdock`，产物在 `src-tauri/target/release/hdock`。
+
+            依赖：Node.js ≥ 20、pnpm。
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
