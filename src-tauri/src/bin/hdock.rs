@@ -79,6 +79,21 @@ enum Cmd {
         #[arg(long, default_value_t = 90)]
         timeout: u64,
     },
+    /// 把一个任务交给实例执行（headless：一条命令进、干完退出），打印结果
+    Run {
+        id: String,
+        /// 任务描述，原样交给 dsh
+        task: String,
+        /// 用哪个 profile；缺省 headless
+        #[arg(long, default_value = "headless")]
+        profile: String,
+        /// 工作目录；缺省用实例登记的 cwd。会话在 dsh 界面里按此目录归档
+        #[arg(long)]
+        cwd: Option<String>,
+        /// 超时秒数
+        #[arg(long, default_value_t = 900)]
+        timeout: u64,
+    },
     /// 停止实例
     Stop { id: String },
     /// 重启实例
@@ -287,6 +302,121 @@ fn start(store: &mut Store, id: &str, timeout: u64, json: bool) -> R<serde_json:
     }
 }
 
+/// dsh persists every run as a session JSONL under `<home>/sessions*/<encoded cwd>/`.
+/// Find the one this run just created so the caller can point at it in the UI.
+fn newest_session_after(home: &Path, after: std::time::SystemTime) -> Option<String> {
+    let mut best: Option<(std::time::SystemTime, String)> = None;
+    let roots = std::fs::read_dir(home).ok()?;
+    for root in roots.flatten() {
+        let name = root.file_name().to_string_lossy().to_string();
+        if !name.starts_with("sessions") || !root.path().is_dir() {
+            continue;
+        }
+        let Ok(wss) = std::fs::read_dir(root.path()) else { continue };
+        for ws in wss.flatten() {
+            let Ok(sessions) = std::fs::read_dir(ws.path()) else { continue };
+            for sess in sessions.flatten() {
+                let n = sess.file_name().to_string_lossy().to_string();
+                if !n.starts_with("session-") {
+                    continue;
+                }
+                let Ok(m) = sess.metadata().and_then(|m| m.modified()) else { continue };
+                if m >= after && best.as_ref().is_none_or(|(bm, _)| m > *bm) {
+                    best = Some((m, n));
+                }
+            }
+        }
+    }
+    best.map(|(_, n)| n)
+}
+
+fn run_task(store: &Store, id: &str, task: &str, profile: &str, cwd: Option<String>, timeout: u64) -> R<serde_json::Value> {
+    let inst = store.instance(id)?.clone();
+    let s = store.reg.settings.clone();
+    if !dsh::runtime_installed(&s.rt_root, &inst.runtime) {
+        return Err(format!("运行时 {} 未安装，先执行 hdock runtime install {}", inst.runtime, inst.runtime));
+    }
+    let home = Path::new(&inst.home);
+    let pdir = home.join("profiles").join(profile);
+    if !pdir.is_dir() {
+        let have: Vec<String> = std::fs::read_dir(home.join("profiles"))
+            .map(|rd| rd.flatten().filter(|e| e.path().is_dir() && e.file_name() != "node_modules").map(|e| e.file_name().to_string_lossy().to_string()).collect())
+            .unwrap_or_default();
+        return Err(format!(
+            "实例 {id} 没有 profile「{profile}」。现有：{}。\n新建一个 headless profile：在 {} 下建目录，或用 hdock template 从别的实例捕获。",
+            have.join(", "),
+            home.join("profiles").display()
+        ));
+    }
+    let cwd_s = cwd.unwrap_or_else(|| inst.cwd.clone());
+    let cwd_p = Path::new(&cwd_s);
+    std::fs::create_dir_all(cwd_p).map_err(|e| format!("工作目录 {} 无法创建: {e}", cwd_p.display()))?;
+
+    let present = envfile::env_keys(home);
+    let missing: Vec<&String> = inst.env_keys.iter().filter(|k| !present.contains(k) && std::env::var(k).is_err()).collect();
+    if !missing.is_empty() {
+        return Err(format!("home/.env 缺少凭证 {:?}，无法调用模型。请自行写入 {}/.env", missing, inst.home));
+    }
+
+    let log_path = store.log_path(id);
+    if let Some(p) = log_path.parent() {
+        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    }
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        let _ = writeln!(f, "[{}] hdock run: profile={} cwd={} task={:?}", now(), profile, cwd_s, task);
+    }
+
+    let bin = dsh::bin_js(&s.rt_root, &inst.runtime);
+    let mut cmd = dsh::command(&s.node_path, &bin, home, cwd_p);
+    cmd.args(["--profile", profile, task]);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    let t0 = Instant::now();
+    let wall0 = std::time::SystemTime::now() - Duration::from_secs(2);
+    let mut child = cmd.spawn().map_err(|e| format!("无法启动 node ({}): {e}", s.node_path))?;
+    let pid = child.id();
+
+    // poll so a hung task cannot block forever
+    let status = loop {
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(st) => break st,
+            None => {
+                if t0.elapsed() > Duration::from_secs(timeout) {
+                    let _ = ports::kill_tree(pid);
+                    let _ = child.wait();
+                    return Err(format!("任务超过 {timeout} 秒未结束，已终止。日志：{}", log_path.display()));
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+        }
+    };
+    let mut out_s = String::new();
+    let mut err_s = String::new();
+    if let Some(mut o) = child.stdout.take() {
+        o.read_to_string(&mut out_s).ok();
+    }
+    if let Some(mut e) = child.stderr.take() {
+        e.read_to_string(&mut err_s).ok();
+    }
+    let secs = t0.elapsed().as_secs();
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        let _ = writeln!(f, "[{}] hdock run: exit={:?} {}s", now(), status.code(), secs);
+        if !err_s.trim().is_empty() {
+            let _ = writeln!(f, "{}", err_s.trim());
+        }
+    }
+    if !status.success() {
+        return Err(format!("任务失败 exit={:?}：\n{}", status.code(), if err_s.trim().is_empty() { out_s.trim() } else { err_s.trim() }));
+    }
+    let session = newest_session_after(home, wall0);
+    if let (Some(sid), Ok(mut f)) = (&session, OpenOptions::new().create(true).append(true).open(&log_path)) {
+        let _ = writeln!(f, "[{}] hdock run: session={}", now(), sid);
+    }
+    Ok(serde_json::json!({
+        "id": id, "profile": profile, "cwd": cwd_s, "seconds": secs,
+        "output": out_s.trim_end(), "log": log_path, "session": session,
+    }))
+}
+
 fn stop(store: &Store, id: &str) -> R<serde_json::Value> {
     let inst = store.instance(id)?.clone();
     let live = ports::listening();
@@ -393,6 +523,10 @@ fn run(cli: Cli) -> R<()> {
         Cmd::Start { id, timeout } => {
             let v = start(&mut store, &id, timeout, json)?;
             out(json, v.clone(), |v| println!("实例 {} 已就绪：{}", id, v["url"].as_str().unwrap_or("")));
+        }
+        Cmd::Run { id, task, profile, cwd, timeout } => {
+            let v = run_task(&store, &id, &task, &profile, cwd, timeout)?;
+            out(json, v.clone(), |v| println!("{}", v["output"].as_str().unwrap_or("")));
         }
         Cmd::Stop { id } => {
             let v = stop(&store, &id)?;

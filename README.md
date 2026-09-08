@@ -68,6 +68,7 @@ hdock scan                                 # 找出磁盘上未纳管的 dsh 安
 hdock import <id> --path <安装目录>          # 原地纳管，端口从池内重新分配
 hdock create <id> --template blank-web      # 新建，端口从池内分配
 hdock start <id> / stop <id> / restart <id>
+hdock run <id> "<任务>"                     # 派一件事给实例，干完退出，打印结果
 hdock validate <id>                        # dsh --dump-config
 hdock logs <id> -n 100
 hdock plugin add <id> <包>@<版本>
@@ -79,7 +80,20 @@ hdock template capture <id> <名称>
 所有命令支持 `--json`。规则与 App 一致：端口只从端口池分配，没有命令接受手填端口；版本必须写明确版本号。
 `hdock delete <id>` 默认只从登记表移除、不动磁盘；`--trash` / `--hard` 才会动 home。
 
-给 Codex 用的 skill 在 `skills/harnessdock/SKILL.md`，复制到 `~/.codex/skills/harnessdock/` 即可。
+### 派任务与记录
+
+`hdock run` 走 dsh 的 headless profile：一条命令进、干完退出。它留下的**是一条完整会话**，
+与用户在浏览器界面里手打的会话同格式、同目录（`home/sessions*/<按 cwd 编码>/session-<id>/session.jsonl`），
+包含任务原文、运行上下文、可用 skills、模型生成的标题与最终回答。`--json` 的返回里带 `session` 字段指向它。
+
+这些记录会显示在该实例的 Web 界面里，前提是界面中把对应目录添加为工作区（每个实例一次性操作）。
+`--cwd` 决定记录归到哪个工作区。
+
+### 给 agent 用的 skill
+
+正文只有一份，在 `skills/harnessdock/SKILL.md`。运行 `skills/install.sh` 会据此生成三份并分别安装到
+Codex（`~/.codex/skills/`）、Claude Code（`~/.claude/skills/`）、WorkBuddy（`~/.workbuddy/skills/`），
+各带一段该 agent 的定位说明。改内容改规范源后重跑脚本，不要分别编辑安装出去的副本。
 
 ## 状态
 
