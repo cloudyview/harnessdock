@@ -5,6 +5,13 @@ use std::path::{Path, PathBuf};
 pub struct Store {
     pub dir: PathBuf,
     pub reg: Registry,
+    /// mtime of registry.json when last read/written; lets the GUI notice
+    /// edits made by the `hdock` CLI (or another process) and reload.
+    pub mtime: Option<std::time::SystemTime>,
+}
+
+fn file_mtime(p: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(p).ok().and_then(|m| m.modified().ok())
 }
 
 impl Store {
@@ -61,13 +68,33 @@ impl Store {
         } else {
             Registry::fresh()
         };
-        let mut s = Store { dir, reg };
+        let mtime = file_mtime(&file);
+        let mut s = Store { dir, reg, mtime };
         s.ensure_builtin_templates();
         s
     }
 
-    pub fn save(&self) -> R<()> {
-        write_json(&self.dir.join("registry.json"), &self.reg)
+    pub fn save(&mut self) -> R<()> {
+        let file = self.dir.join("registry.json");
+        write_json(&file, &self.reg)?;
+        self.mtime = file_mtime(&file);
+        Ok(())
+    }
+
+    /// Re-read registry.json if another process wrote it since we last did.
+    /// Returns true when a reload happened.
+    pub fn reload_if_changed(&mut self) -> bool {
+        let file = self.dir.join("registry.json");
+        let now = file_mtime(&file);
+        if now.is_some() && now != self.mtime {
+            if let Ok(r) = read_json::<Registry>(&file) {
+                self.reg = r;
+                self.mtime = now;
+                self.ensure_builtin_templates();
+                return true;
+            }
+        }
+        false
     }
 
     fn ensure_builtin_templates(&mut self) {

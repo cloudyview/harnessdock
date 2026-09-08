@@ -69,6 +69,10 @@ fn pick_port(store: &Store, want: Option<u16>) -> R<u16> {
     let used = store.used_ports();
     match want {
         Some(p) => {
+            let s = &store.reg.settings;
+            if p < s.pool_start || p > s.pool_end {
+                return Err(format!("端口 {p} 不在端口池 {}–{} 内；规则：所有实例端口只从池内分配", s.pool_start, s.pool_end));
+            }
             if used.contains(&p) {
                 return Err(format!("端口 {p} 已分配给其他实例"));
             }
@@ -307,6 +311,18 @@ pub fn delete(store: &mut Store, id: &str, hard: bool) -> R<()> {
             cwd: inst.cwd.clone(),
         });
     }
+    let idir = store.inst_dir(id);
+    if idir.exists() {
+        let _ = fs::remove_dir_all(&idir);
+    }
+    store.reg.instances.retain(|i| i.id != id);
+    store.save()
+}
+
+/// Drop an instance from the registry without touching its home on disk.
+/// Meant for in-place imports whose home lives in its own git repo.
+pub fn unregister(store: &mut Store, id: &str) -> R<()> {
+    store.instance(id)?;
     let idir = store.inst_dir(id);
     if idir.exists() {
         let _ = fs::remove_dir_all(&idir);

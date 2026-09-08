@@ -25,7 +25,7 @@
 
 ## 依赖
 
-- Windows 10/11（WebView2 已内置）
+- Windows 10/11（WebView2 已内置）或 macOS 12+
 - Node.js ≥ 20（运行 dsh）
 - pnpm（dsh 用它安装插件；`npm i -g pnpm`）
 
@@ -47,6 +47,39 @@ pnpm tauri build      # 产出安装包到 src-tauri/target/release/bundle
 - `cordis.patch.yml` 含 `!!js` 自定义标签，本应用**不整文件解析重写**，只追加 / 替换带 `# harnessdock:begin <key>` … `# harnessdock:end <key>` 标记的区块；你手写的内容不会被动。每次写完可一键跑 `--dump-config` 校验。
 - 安装插件必须写明确版本号（禁止 `latest`），因为 npm 上部分 dsh 包的 dist-tag 指向断依赖的旧版。
 - dsh 仍是 rc 版，官方明说会破坏兼容；运行时按版本目录隔离，模板绑定版本。
+
+## macOS
+
+源码在 macOS 上可直接构建（Tauri 2 → `.app` + `.dmg`）。与 Windows 的差异都在进程/端口层：
+端口占用用 `lsof`、进程存活用 `kill -0`、命令行用 `ps`，停止用 `pkill -P` + `kill`。
+从 Finder 启动的 App 没有 shell 的 PATH，所以设置里的 node / pnpm 建议填绝对路径；
+App 启动时会把这两个目录补进自己的 PATH，dsh 内部调用 pnpm 才能找到。
+
+## 命令行 `hdock`
+
+同一份代码里还有一个 CLI（`src-tauri/src/bin/hdock.rs`），给脚本和编码 agent（Codex、Claude Code）用。
+它与桌面 App 共用 `~/.harnessdock/registry.json`：CLI 写了登记表 App 会自动重读；CLI 启动的实例 App 通过端口扫描接管。
+App 不需要开着。
+
+```bash
+cargo build --release --bin hdock          # 产物 src-tauri/target/release/hdock，复制到 PATH 即可
+hdock list                                 # 实例、状态、端口
+hdock scan                                 # 找出磁盘上未纳管的 dsh 安装
+hdock import <id> --path <安装目录>          # 原地纳管，端口从池内重新分配
+hdock create <id> --template blank-web      # 新建，端口从池内分配
+hdock start <id> / stop <id> / restart <id>
+hdock validate <id>                        # dsh --dump-config
+hdock logs <id> -n 100
+hdock plugin add <id> <包>@<版本>
+hdock model set <id> deepseek/deepseek-v4-pro
+hdock runtime install 0.1.2-rc.1           # 金丝雀：装新版 → 在一个实例上 validate → runtime default
+hdock template capture <id> <名称>
+```
+
+所有命令支持 `--json`。规则与 App 一致：端口只从端口池分配，没有命令接受手填端口；版本必须写明确版本号。
+`hdock delete <id>` 默认只从登记表移除、不动磁盘；`--trash` / `--hard` 才会动 home。
+
+给 Codex 用的 skill 在 `skills/harnessdock/SKILL.md`，复制到 `~/.codex/skills/harnessdock/` 即可。
 
 ## 状态
 

@@ -13,7 +13,16 @@ pub fn listening() -> HashMap<u16, u32> {
             Err(_) => HashMap::new(),
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("lsof");
+        c.args(["-nP", "-iTCP", "-sTCP:LISTEN"]);
+        match run_capture(&mut c) {
+            Ok((_, text)) => parse_lsof(&text),
+            Err(_) => HashMap::new(),
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let mut c = std::process::Command::new("ss");
         c.args(["-ltnp"]);
@@ -22,6 +31,24 @@ pub fn listening() -> HashMap<u16, u32> {
             Err(_) => HashMap::new(),
         }
     }
+}
+
+/// Parse `lsof -nP -iTCP -sTCP:LISTEN` output (macOS / BSD).
+#[allow(dead_code)]
+pub fn parse_lsof(text: &str) -> HashMap<u16, u32> {
+    let mut m = HashMap::new();
+    for line in text.lines().skip(1) {
+        let cols: Vec<&str> = line.split_whitespace().collect();
+        if cols.len() < 9 {
+            continue;
+        }
+        let pid = cols[1].parse::<u32>().ok();
+        let port = port_of(cols[8].trim_end_matches("(LISTEN)"));
+        if let (Some(p), Some(pid)) = (port, pid) {
+            m.entry(p).or_insert(pid);
+        }
+    }
+    m
 }
 
 pub fn parse_netstat(text: &str) -> HashMap<u16, u32> {
@@ -80,7 +107,13 @@ pub fn cmdline(pid: u32) -> Option<String> {
         quiet(&mut c);
         run_capture(&mut c).ok().map(|(_, t)| t.trim().to_string()).filter(|s| !s.is_empty())
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("ps");
+        c.args(["-o", "command=", "-p", &pid.to_string()]);
+        run_capture(&mut c).ok().map(|(_, t)| t.trim().to_string()).filter(|s| !s.is_empty())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         std::fs::read_to_string(format!("/proc/{pid}/cmdline"))
             .ok()
@@ -99,7 +132,13 @@ pub fn pid_alive(pid: u32) -> bool {
             Err(_) => false,
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("kill");
+        c.args(["-0", &pid.to_string()]);
+        matches!(run_capture(&mut c), Ok((true, _)))
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         std::path::Path::new(&format!("/proc/{pid}")).exists()
     }
@@ -143,6 +182,15 @@ mod tests {
         assert_eq!(m.get(&41102), Some(&99));
         assert_eq!(m.get(&135), Some(&1234));
         assert_eq!(m.len(), 3);
+    }
+
+    #[test]
+    fn parses_macos_lsof() {
+        let sample = "COMMAND     PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nnode      24816 minidj   23u  IPv4 0x1234      0t0  TCP 127.0.0.1:41101 (LISTEN)\nrapportd    512 minidj    4u  IPv6 0x5678      0t0  TCP *:41102 (LISTEN)\n";
+        let m = parse_lsof(sample);
+        assert_eq!(m.get(&41101), Some(&24816));
+        assert_eq!(m.get(&41102), Some(&512));
+        assert_eq!(m.len(), 2);
     }
 
     #[test]

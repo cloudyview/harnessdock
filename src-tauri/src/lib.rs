@@ -22,7 +22,27 @@ use tauri::{Manager, WindowEvent};
 pub fn run() {
     let data_dir = store::Store::data_dir();
     std::fs::create_dir_all(&data_dir).ok();
-    let state = Arc::new(AppState { store: Mutex::new(store::Store::open(data_dir)), procs: procs::ProcManager::default() });
+    let store = store::Store::open(data_dir);
+    // GUI apps on macOS/Linux start with a minimal PATH (no nvm/hermes/homebrew
+    // dirs), so dsh's own `pnpm` calls would fail. Prepend the dirs of the
+    // configured node/pnpm binaries.
+    #[cfg(not(windows))]
+    {
+        let mut extra: Vec<String> = Vec::new();
+        for p in [&store.reg.settings.node_path, &store.reg.settings.pnpm_path] {
+            if let Some(dir) = std::path::Path::new(p).parent() {
+                let d = dir.to_string_lossy().to_string();
+                if !d.is_empty() && dir.is_absolute() && !extra.contains(&d) {
+                    extra.push(d);
+                }
+            }
+        }
+        if !extra.is_empty() {
+            let cur = std::env::var("PATH").unwrap_or_default();
+            std::env::set_var("PATH", format!("{}:{}", extra.join(":"), cur));
+        }
+    }
+    let state = Arc::new(AppState { store: Mutex::new(store), procs: procs::ProcManager::default() });
     commands::adopt_orphans(&state);
 
     tauri::Builder::default()
@@ -69,7 +89,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let st = window.state::<Arc<AppState>>();
-                let action = st.store.lock().unwrap().reg.settings.close_action.clone();
+                let action = st.store().reg.settings.close_action.clone();
                 match action.as_str() {
                     "exit" => {}
                     "exit-stop" => stop_all(&st),
@@ -128,7 +148,7 @@ pub fn run() {
 
 fn stop_all(st: &Arc<AppState>) {
     for id in st.procs.running_ids() {
-        let log = st.store.lock().unwrap().log_path(&id);
+        let log = st.store().log_path(&id);
         let _ = st.procs.stop(&id, &log);
     }
 }
